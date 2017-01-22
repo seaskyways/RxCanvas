@@ -1,6 +1,7 @@
 package seaskyways.rxcanvas
 
 import java.lang.ref.WeakReference
+import java.util.concurrent.atomic.AtomicReferenceArray
 
 /**
  * Created by Ahmad on 15/01 Jan/2017.
@@ -11,3 +12,4 @@ inline fun <reified T : Any> T.className(): String
 fun <T, R> WeakReference<T>.safe(body: T.() -> R?): R? {
     return this.get()?.body()
 }
+

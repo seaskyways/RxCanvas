@@ -7,12 +7,13 @@ import android.view.*
 import com.trello.rxlifecycle2.android.ActivityEvent
 import io.reactivex.Observable
 import io.reactivex.android.schedulers.AndroidSchedulers.mainThread
+import io.reactivex.schedulers.Schedulers
 import io.reactivex.schedulers.Schedulers.computation
 import io.reactivex.schedulers.Schedulers.newThread
 import io.reactivex.subjects.*
 import org.jetbrains.anko.*
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.*
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Created by Ahmad on 15/01 Jan/2017.
@@ -23,9 +24,17 @@ class CircleView : View, AnkoLogger {
     constructor(context: Context?, attrs: AttributeSet?, defStyleAttr: Int) : super(context, attrs, defStyleAttr)
     
     //    val refresherSubject = PublishSubject.create<Any>()!!
+    val Paints = object {
+        
+    }
+    
     val currPointSubject = BehaviorSubject.createDefault<PointF>(PointF(0f, 0f))!!
     val ballsObservable = ReplaySubject.create<Ball>()!!
-    val ballDisposalSubject = BehaviorSubject.create<Int>()
+    val ballDisposalSubject: BehaviorSubject<Int> = BehaviorSubject.create<Int>()
+    
+    val userBallOverlapSubject = BehaviorSubject.createDefault(false)
+    
+    var shouldContinue = true
     
     var lifecycleObservable: Observable<ActivityEvent>? = null
         set(value) {
@@ -38,9 +47,9 @@ class CircleView : View, AnkoLogger {
     val currX: Float get() = currPointSubject.value.x
     val currY: Float get() = currPointSubject.value.y
     
-    inner class Ball(val id: Int = 1, val y: Int) {
-        val minTime = (1000000000L * (Math.sqrt(id.toDouble()))).toLong()
-        val maxTime = (3000000000L * (Math.sqrt(id.toDouble()))).toLong()
+    inner class Ball(val id: Int = 1, val y: Int, val radius: Long = 100L, x: Long? = null) : Renderable {
+        val minTime = (1000000000L * (Math.log10(id.toDouble()))).toLong()
+        val maxTime = (3000000000L * (Math.log10(id.toDouble()))).toLong()
         
         fun getRandTime() = minTime + (Math.random() * (maxTime - minTime))
         val timeWithDistance: Lazy<Long>
@@ -48,9 +57,9 @@ class CircleView : View, AnkoLogger {
         
         var canDispose = false
         var isAnimating = false
-        val xExtremity = measuredWidth.toLong() + 100L
+        val xExtremity = measuredWidth.toLong() + radius
         
-        var x = AtomicLong(xExtremity)
+        var x = AtomicLong(x ?: xExtremity)
         
         val idTextBox = Rect()
         
@@ -61,12 +70,12 @@ class CircleView : View, AnkoLogger {
         fun startAnim() {
             isAnimating = true
             Observable.interval(timeWithDistance.value, TimeUnit.NANOSECONDS)
-                    .filter { currLifecycle == ActivityEvent.RESUME }
+                    .filter { shouldContinue }
                     .map { 0.001 }
                     .scan(Double::plus)
                     .map { 1 - it }
                     .takeWhile { it > 0 }
-                    .map { (xExtremity) * it - 50 }
+                    .map { (xExtremity) * it - (radius / 2) }
                     .map(Double::toLong)
                     .subscribe(
                             {
@@ -81,15 +90,26 @@ class CircleView : View, AnkoLogger {
                                 isAnimating = false
                             })
         }
+        
+        override fun render(canvas: Canvas) {
+            canvas.drawCircle(this.x.get().toFloat(), this.y.toFloat(), radius.toFloat(), circlePaint)
+            canvas.drawText(currentBalls.indexOf(this@Ball).toString(), this.x.get().toFloat(), this.y.toFloat() + this.idTextBox.height() / 2, textPaint)
+            if (!this.isAnimating && !this.canDispose)
+                this.startAnim()
+        }
+        
+        fun isIntersecting(another: Ball): Boolean {
+            return (Math.abs(x.get() - another.x.get()) <= radius * 2) && (Math.abs(y - another.y) <= radius * 2)
+        }
     }
     
-    val radius = 30f
+    val stroke = 30f
     val randY: Int get() = (measuredHeight * Math.random()).toInt()
     
     val circlePaint = Paint().apply {
         color = Color.BLACK
         style = Paint.Style.STROKE
-        strokeWidth = radius
+        strokeWidth = stroke
     }
     
     val textPaint = Paint().apply {
@@ -100,19 +120,18 @@ class CircleView : View, AnkoLogger {
     
     val refresher: Observable<Long>
     
-    val currentBalls = AtomicReferenceArray<Ball?>(45)
+    val currentBalls = AtomicArray<Ball?>(45)
     
     init {
         refresher = Observable.interval(15, TimeUnit.MILLISECONDS)
-                .filter { currLifecycle == ActivityEvent.RESUME }
+                .filter { shouldContinue }
                 .observeOn(mainThread())
         
         refresher.subscribe { invalidate() }
         
-        val timer = Observable.interval(1, TimeUnit.SECONDS)
-                .filter { currLifecycle == ActivityEvent.RESUME }
-                .map { 1 }
-                .scan { i2: Int, i1: Int -> i2 + i1 }
+        val timer = Observable.interval(250, TimeUnit.MILLISECONDS)
+                .filter { shouldContinue }
+                .map(Long::toInt)
         
         timer
                 .subscribeOn(computation())
@@ -134,42 +153,53 @@ class CircleView : View, AnkoLogger {
         ballsObservable
                 .subscribeOn(newThread())
                 .observeOn(newThread())
-                .doOnNext {
-                    clearDisposableBalls()
-                }
+//                .doOnNext {
+//                    clearDisposableBalls()
+//                }
                 .subscribe { ball ->
-                    val nearestNullIndex = nearestNullIndex() ?: run {
-                        currentBalls.set(0, null)
-                        0
-                    }
+                    val nearestNullIndex = nearestNullIndex()
                     nearestNullIndex.let {
                         currentBalls.set(it, ball)
                     }
                 }
+        
+        refresher
+                .observeOn(Schedulers.single())
+                .subscribe {
+                    val overlap = currentBalls
+                            .indexOfFirst { it?.isIntersecting(Ball(y = currY.toInt(),x = currX.toLong())) ?: false } != -1
+                    userBallOverlapSubject.onNext(overlap)
+                }
     }
     
-    fun nearestNullIndex(): Int? {
-        (0 until currentBalls.length())
+    fun nearestNullIndex(): Int {
+        val index = (0 until currentBalls.length())
                 .filter { currentBalls[it] == null }
-                .forEach {
-                    return it
+                .firstOrNull() ?:
+                run {
+                    return@run 0
                 }
-        return null
+        return index
+    }
+    
+    val nearestNullIndexText: Renderable = object : Renderable {
+        override fun render(canvas: Canvas) {
+            canvas.drawText(nearestNullIndex().toString(), 50f, measuredHeight.toFloat() - 50, textPaint)
+        }
     }
     
     fun clearDisposableBalls() {
-        (0 until currentBalls.length())
-                .forEach {
-                    if (currentBalls[it] != null) {
-                        warn("can dispose $it : ${currentBalls[it]?.canDispose}")
-                        currentBalls[it]?.let { ball ->
-                            if (ball.canDispose) {
-                                warn("Disposing ball ${ball.id}")
-                                currentBalls.set(it, null)
-                            }
-                        }
-                    }
-                }
+//        (0 until currentBalls.length())
+//                .forEach {
+//                    if (currentBalls[it] != null) {
+//                        currentBalls[it]?.let { ball ->
+//                            if (ball.canDispose) {
+//                                warn("Disposing ball ${ball.id}")
+//                                currentBalls.set(it, null)
+//                            }
+//                        }
+//                    }
+//                }
     }
     
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
@@ -180,19 +210,14 @@ class CircleView : View, AnkoLogger {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         canvas.apply {
-            drawCircle(currX, currY, 100f, circlePaint)
-            
+            nearestNullIndexText.render(canvas)
             (0 until currentBalls.length())
                     .map { currentBalls[it] }
                     .filter { it != null }
                     .forEach {
-                        it?.let { ball ->
-                            drawCircle(ball.x.get().toFloat(), ball.y.toFloat(), 100f, circlePaint)
-                            drawText(ball.id.toString(), ball.x.get().toFloat(), ball.y.toFloat() + ball.idTextBox.height() / 2, textPaint)
-                            if (!ball.isAnimating && !ball.canDispose)
-                                ball.startAnim()
-                        }
+                        it?.render(canvas)
                     }
+            drawCircle(currX, currY, 100f, circlePaint)
         }
     }
     
