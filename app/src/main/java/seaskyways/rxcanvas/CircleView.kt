@@ -26,7 +26,7 @@ class CircleView : View, AnkoLogger {
     
     var userBallRadius = dip(30)
     val stroke by lazy { dip(10) }
-    
+    val dp = dip(1)
     
     private val Subjects = object {
         val refresh = PublishSubject.create<Unit>()!!
@@ -83,6 +83,8 @@ class CircleView : View, AnkoLogger {
     //    var currX: Float = 0f
 //    var currY: Float = 0f
     val userPoint = PointF(0f, 0f)
+    var userPointVelocity = 0.0
+    
     
     init {
         Observables.userPointSubject
@@ -90,6 +92,22 @@ class CircleView : View, AnkoLogger {
                 .sample(1, TimeUnit.MILLISECONDS)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe { userPoint.set(it.x, it.y) }
+        
+        Observables.userPointSubject
+                .observeOn(Schedulers.computation())
+                .sample(5, TimeUnit.MILLISECONDS)
+                .buffer(2)
+                .map {
+                    val dx = it[1].x - it[0].x
+                    val dy = it[1].y - it[0].y
+                    if (dx > 0 || dy > 0) {
+                        warn("dx : $dx, dy : $dy")
+                    }
+                    Math.sqrt((dx * dx + dy * dy).toDouble()) / 0.0005
+                 }
+                .filter { it != userPointVelocity }
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe { userPointVelocity = it  }
     }
     
     inner class Ball(val id: Int = 1, val y: Int, val radius: Long = dip(25).toLong(), x: Long? = null) : Renderable {
@@ -154,7 +172,6 @@ class CircleView : View, AnkoLogger {
     }
     
     val randY: Int get() = (measuredHeight * Math.random()).toInt()
-    
     
     val refresher: Flowable<Unit>
     
@@ -258,7 +275,7 @@ class CircleView : View, AnkoLogger {
     }
     
     val bottomLeftText: Renderable = rederable { canvas ->
-        canvas.drawText("Score : ${score.get()}", 50f, measuredHeight.toFloat() - 50, Paints.bottomLeftText)
+        canvas.drawText("Score : ${score.get()} , Velocity : $userPointVelocity", 50f, measuredHeight.toFloat() - 50, Paints.bottomLeftText)
     }
     
     private val touchedPoint = PointF(0f, 0f)
