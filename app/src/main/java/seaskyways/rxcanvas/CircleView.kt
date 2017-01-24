@@ -24,9 +24,8 @@ class CircleView : View, AnkoLogger {
     constructor(context: Context?, attrs: AttributeSet?) : super(context, attrs)
     constructor(context: Context?, attrs: AttributeSet?, defStyleAttr: Int) : super(context, attrs, defStyleAttr)
     
-    //    val refresherSubject = PublishSubject.create<Any>()!!
-    
     var userBallRadius = dip(30)
+    val stroke by lazy { dip(10) }
     
     
     private val Subjects = object {
@@ -47,7 +46,7 @@ class CircleView : View, AnkoLogger {
         val circlePaint = Paint().apply {
             color = Color.BLACK
             style = Paint.Style.STROKE
-            strokeWidth = stroke
+            strokeWidth = stroke.toFloat()
         }
         
         var userCirclePaint = Paint(circlePaint).apply {
@@ -59,14 +58,14 @@ class CircleView : View, AnkoLogger {
         }
     }
     private val Observables = object {
-        val userPointSubject = BehaviorSubject.create<PointF>()
+        val userPointSubject = PublishSubject.create<PointF>()
     }
     
     
     //    val currPointSubject = BehaviorSubject.create<MotionEvent>()!!
     val score = AtomicInteger(0)
     
-    val ballsObservable = ReplaySubject.create<Ball>()!!
+    val ballsObservable = PublishSubject.create<Ball>()!!
     val ballDisposalSubject: BehaviorSubject<Int> = BehaviorSubject.create<Int>()
     
     val userBallOverlapSubject: BehaviorSubject<Boolean> = BehaviorSubject.create()
@@ -87,7 +86,9 @@ class CircleView : View, AnkoLogger {
     
     init {
         Observables.userPointSubject
-                .sample(2, TimeUnit.MILLISECONDS)
+                .subscribeOn(Schedulers.newThread())
+                .sample(1, TimeUnit.MILLISECONDS)
+                .observeOn(AndroidSchedulers.mainThread())
                 .subscribe { userPoint.set(it.x, it.y) }
     }
     
@@ -152,7 +153,6 @@ class CircleView : View, AnkoLogger {
         }
     }
     
-    val stroke = 30f
     val randY: Int get() = (measuredHeight * Math.random()).toInt()
     
     
@@ -197,16 +197,14 @@ class CircleView : View, AnkoLogger {
                 .map(Long::toInt)
         
         timer
-                .subscribeOn(computation())
+                .observeOn(computation())
                 .subscribe({ ballsObservable.onNext(Ball(it, randY)) }, Throwable::printStackTrace)
         
         ballDisposalSubject
                 .observeOn(newThread())
-                .flatMap { ballId ->
+                .flatMapIterable { ballId ->
                     (0 until currentBalls.length())
                             .filter { i -> currentBalls[i]?.id ?: 0 == ballId }
-                            .forEach { return@flatMap Observable.just(it) }
-                    return@flatMap Observable.empty<Int>()
                 }
                 .subscribe {
                     currentBalls.set(it, null)
@@ -231,7 +229,14 @@ class CircleView : View, AnkoLogger {
                 .observeOn(Schedulers.single())
                 .subscribe {
                     val overlap = currentBalls
-                            .indexOfFirst { it?.isIntersecting(Ball(y = userPoint.y.toInt(), x = userPoint.x.toLong(), radius = userBallRadius.toLong())) ?: false } != -1
+                            .indexOfFirst {
+                                it?.isIntersecting(
+                                        Ball(
+                                                y = userPoint.y.toInt(),
+                                                x = userPoint.x.toLong(),
+                                                radius = userBallRadius.toLong()
+                                        )) ?: false
+                            } != -1
                     userBallOverlapSubject.onNext(overlap)
                 }
         
@@ -256,22 +261,10 @@ class CircleView : View, AnkoLogger {
         canvas.drawText("Score : ${score.get()}", 50f, measuredHeight.toFloat() - 50, Paints.bottomLeftText)
     }
     
-    fun clearDisposableBalls() {
-//        (0 until currentBalls.length())
-//                .forEach {
-//                    if (currentBalls[it] != null) {
-//                        currentBalls[it]?.let { ball ->
-//                            if (ball.canDispose) {
-//                                warn("Disposing ball ${ball.id}")
-//                                currentBalls.set(it, null)
-//                            }
-//                        }
-//                    }
-//                }
-    }
-    
+    private val touchedPoint = PointF(0f, 0f)
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        Observables.userPointSubject.onNext(PointF(event.x, event.y))
+        touchedPoint.set(event.x, event.y)
+        Observables.userPointSubject.onNext(touchedPoint)
         return true
     }
     
