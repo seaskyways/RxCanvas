@@ -3,6 +3,7 @@ package seaskyways.rxcanvas
 import io.reactivex.Observable
 import io.reactivex.schedulers.Schedulers.*
 import org.junit.Test
+import java.lang.System.nanoTime
 import java.lang.Thread.currentThread
 import java.lang.Thread.sleep
 
@@ -56,4 +57,24 @@ class RxTest {
         sleep(1000)
     }
     
+    @Test
+    fun concurrencyTest() {
+        val startTime = nanoTime()
+        Observable.range(0 , 10)
+                .map { object {
+                    val id = it
+                    val time = it * Math.random() * 100
+                } }
+                .flatMap {
+                    Observable.just(it)
+                            .subscribeOn(computation())
+                            .doOnNext { Thread.sleep(it.time.toLong()) }
+                }
+                .observeOn(trampoline())
+                .blockingSubscribe({
+                    println("Just received ${it.id} of time ${it.time}")
+                })
+                
+        println("Ended with at ${nanoTime() - startTime}")
+    }
 }

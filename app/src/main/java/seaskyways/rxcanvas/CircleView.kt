@@ -3,18 +3,25 @@ package seaskyways.rxcanvas
 import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
-import android.view.*
+import android.view.MotionEvent
+import android.view.View
 import com.trello.rxlifecycle2.android.ActivityEvent
-import io.reactivex.*
+import io.reactivex.BackpressureStrategy
+import io.reactivex.Flowable
+import io.reactivex.Observable
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.schedulers.Schedulers
 import io.reactivex.schedulers.Schedulers.*
-import io.reactivex.subjects.*
+import io.reactivex.subjects.BehaviorSubject
+import io.reactivex.subjects.PublishSubject
 import io.reactivex.subscribers.DisposableSubscriber
-import org.jetbrains.anko.*
+import org.jetbrains.anko.AnkoLogger
+import org.jetbrains.anko.dip
+import org.jetbrains.anko.sp
 import seaskyways.rxcanvas.Renderable.Companion.rederable
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.*
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Created by Ahmad on 15/01 Jan/2017.
@@ -24,7 +31,8 @@ class CircleView : View, AnkoLogger {
     constructor(context: Context?, attrs: AttributeSet?) : super(context, attrs)
     constructor(context: Context?, attrs: AttributeSet?, defStyleAttr: Int) : super(context, attrs, defStyleAttr)
     
-    var userBallRadius = dip(30)
+    val baseUserBallRadius = dip(30)
+    var userBallRadius = baseUserBallRadius
     val stroke by lazy { dip(10) }
     val dp = dip(1)
     
@@ -80,11 +88,11 @@ class CircleView : View, AnkoLogger {
     
     var currLifecycle: ActivityEvent = ActivityEvent.PAUSE
     
-    //    var currX: Float = 0f
-//    var currY: Float = 0f
+    
     val userPoint = PointF(0f, 0f)
     var userPointVelocity = 0.0
-    
+    var userPointAcceleration = 0.0
+    val userPointVelocityObservable: Observable<Double>
     
     init {
         Observables.userPointSubject
@@ -93,21 +101,28 @@ class CircleView : View, AnkoLogger {
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe { userPoint.set(it.x, it.y) }
         
-        Observables.userPointSubject
+        
+        val userVelocityRefreshRate = 4L
+        userPointVelocityObservable = Observables.userPointSubject
                 .observeOn(Schedulers.computation())
-                .sample(5, TimeUnit.MILLISECONDS)
+                .sample(userVelocityRefreshRate, TimeUnit.MILLISECONDS)
                 .buffer(2)
                 .map {
-                    val dx = it[1].x - it[0].x
-                    val dy = it[1].y - it[0].y
-                    if (dx > 0 || dy > 0) {
-                        warn("dx : $dx, dy : $dy")
-                    }
-                    Math.sqrt((dx * dx + dy * dy).toDouble()) / 0.0005
-                 }
-                .filter { it != userPointVelocity }
+                    val dx = dip(it[1].x - it[0].x)
+                    val dy = dip(it[1].y - it[0].y)
+                    Math.sqrt((dx * dx + dy * dy).toDouble()) / userVelocityRefreshRate
+                }
+//
+        userPointVelocityObservable
+                .observeOn(computation())
+                .map { it.coerceIn(1.0, 100.0) }
+                .map { it * (3.0 / 100.0) }
+                .map { it.coerceAtLeast(1.0) }
                 .observeOn(AndroidSchedulers.mainThread())
-                .subscribe { userPointVelocity = it  }
+                .subscribe {
+                    userPointVelocity = it
+                    userBallRadius = (baseUserBallRadius / userPointVelocity).toInt()
+                }
     }
     
     inner class Ball(val id: Int = 1, val y: Int, val radius: Long = dip(25).toLong(), x: Long? = null) : Renderable {
@@ -267,10 +282,8 @@ class CircleView : View, AnkoLogger {
     fun nearestNullIndex(): Int {
         val index = (0 until currentBalls.length())
                 .filter { currentBalls[it] == null }
-                .firstOrNull() ?:
-                run {
-                    return@run 0
-                }
+                .firstOrNull() ?: 0
+        
         return index
     }
     
@@ -278,10 +291,9 @@ class CircleView : View, AnkoLogger {
         canvas.drawText("Score : ${score.get()} , Velocity : $userPointVelocity", 50f, measuredHeight.toFloat() - 50, Paints.bottomLeftText)
     }
     
-    private val touchedPoint = PointF(0f, 0f)
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        touchedPoint.set(event.x, event.y)
-        Observables.userPointSubject.onNext(touchedPoint)
+        
+        Observables.userPointSubject.onNext(PointF(event.x, event.y))
         return true
     }
     
