@@ -181,7 +181,7 @@ class CircleView : View, AnkoLogger {
         fun isIntersecting(another: Ball): Boolean {
             val distanceXS = Math.pow((x.get() - another.x.get()).toDouble(), 2.0)
             val distanceYS = Math.pow((y - another.y).toDouble(), 2.0)
-            val radiiS = Math.pow((radius + another.radius).toDouble(), 2.0)
+            val radiiS = Math.pow(((radius + stroke / 2) + (another.radius + stroke / 2)).toDouble(), 2.0)
             return distanceXS + distanceYS <= (radiiS)
         }
     }
@@ -289,7 +289,7 @@ class CircleView : View, AnkoLogger {
     }
     
     val bottomLeftText: Renderable = rederable { canvas ->
-        canvas.drawText("Score : ${score.get()} , Velocity : $userPointVelocity", 50f, measuredHeight.toFloat() - 50, Paints.bottomLeftText)
+        canvas.drawText("Score : ${score.get()}", 50f, measuredHeight.toFloat() - 50, Paints.bottomLeftText)
     }
     
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
