@@ -13,11 +13,12 @@ class MainActivity : RxActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        startLogic()
+        startLogic(true)
         
     }
     
-    fun startLogic() {
+    fun startLogic(isOnCreate : Boolean = false) {
+        if (!isOnCreate) find<CircleView>(R.id.circle_view).dispose()
         setContentView(R.layout.activity_main)
         
         val circleView = find<CircleView>(R.id.circle_view)
