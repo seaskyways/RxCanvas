@@ -106,7 +106,7 @@ class CircleView : View, AnkoLogger,Disposable {
     init {
         Observables.userPointSubject
                 .subscribeOn(Schedulers.newThread())
-                .sample(1, TimeUnit.MILLISECONDS)
+                .sample(9, TimeUnit.MILLISECONDS)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe { userPoint.set(it.x, it.y) }
                 .addToDisposables()
@@ -164,6 +164,7 @@ class CircleView : View, AnkoLogger,Disposable {
         fun startAnim() {
             isAnimating = true
             Observable.interval(timeWithDistance.value, TimeUnit.NANOSECONDS)
+                    .subscribeOn(newThread())
                     .filter { shouldContinue }
                     .map { 0.001 }
                     .scan(Double::plus)
@@ -236,7 +237,7 @@ class CircleView : View, AnkoLogger,Disposable {
     
         refresher = Subjects.refresh
                 .subscribeOn(newThread())
-                .sample(5, TimeUnit.MILLISECONDS)
+                .sample(1, TimeUnit.MILLISECONDS)
                 .toFlowable(BackpressureStrategy.DROP)
         
         refresher
@@ -250,6 +251,7 @@ class CircleView : View, AnkoLogger,Disposable {
         
         timer
                 .observeOn(computation())
+                .map { it + 2 }
                 .subscribe({ ballsObservable.onNext(Ball(it, randY)) }, Throwable::printStackTrace)
                 .addToDisposables()
     
