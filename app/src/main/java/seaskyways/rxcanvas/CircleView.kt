@@ -258,6 +258,7 @@ class CircleView : View, AnkoLogger {
         
         refresher
 //                .delay(1, TimeUnit.MILLISECONDS)
+                .filter { !(userBallOverlapSubject.value ?: false) }
                 .observeOn(Schedulers.single())
                 .subscribe {
                     val overlap = currentBalls
