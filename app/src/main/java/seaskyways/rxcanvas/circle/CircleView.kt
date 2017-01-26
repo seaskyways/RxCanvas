@@ -1,4 +1,4 @@
-package seaskyways.rxcanvas
+package seaskyways.rxcanvas.circle
 
 import android.content.Context
 import android.graphics.*
@@ -13,6 +13,7 @@ import io.reactivex.schedulers.Schedulers.*
 import io.reactivex.subjects.*
 import io.reactivex.subscribers.DisposableSubscriber
 import org.jetbrains.anko.*
+import seaskyways.rxcanvas.*
 import seaskyways.rxcanvas.Renderable.Companion.rederable
 import java.lang.Math.pow
 import java.lang.Math.sqrt
@@ -22,8 +23,8 @@ import java.util.concurrent.atomic.*
 /**
  * Created by Ahmad on 15/01 Jan/2017.
  */
-class CircleView : View, AnkoLogger,Disposable {
-
+class CircleView : View, AnkoLogger, Disposable {
+    
     
     constructor(context: Context?) : super(context)
     constructor(context: Context?, attrs: AttributeSet?) : super(context, attrs)
@@ -32,19 +33,7 @@ class CircleView : View, AnkoLogger,Disposable {
     private val disposables = CompositeDisposable()
     private fun Disposable.addToDisposables() = apply { disposables.add(this) }
     
-    override fun isDisposed(): Boolean {
-        return disposables.isDisposed
-    }
     
-    override fun dispose() {
-        disposables.dispose()
-    }
-    
-    val baseUserBallRadius = dip(30)
-    var userBallRadius = baseUserBallRadius
-    val stroke by lazy { dip(10) }
-    val dp = dip(1)
-    val maxDiagonalDistance by lazy { sqrt(pow(dip(measuredHeight).toDouble(), 2.0) + pow(dip(measuredWidth).toDouble(), 2.0)) }
     private val Subjects = object {
         val refresh = PublishSubject.create<Unit>()!!
     }
@@ -64,7 +53,7 @@ class CircleView : View, AnkoLogger,Disposable {
         val circlePaint = Paint().apply {
             color = Color.BLACK
             style = Paint.Style.STROKE
-            strokeWidth = stroke.toFloat()
+            strokeWidth = defaultStrokeWidth.toFloat()
         }
         
         var userCirclePaint = Paint(circlePaint).apply {
@@ -79,29 +68,24 @@ class CircleView : View, AnkoLogger,Disposable {
         val userPointSubject = PublishSubject.create<PointF>()
     }
     
-    //    val currPointSubject = BehaviorSubject.create<MotionEvent>()!!
-    val score = AtomicInteger(0)
+    override fun isDisposed(): Boolean {
+        return disposables.isDisposed
+    }
     
-    val ballsObservable = PublishSubject.create<Ball>()!!
-    val ballDisposalSubject: BehaviorSubject<Int> = BehaviorSubject.create<Int>()
+    override fun dispose() {
+        disposables.dispose()
+    }
     
-    val userBallOverlapSubject: BehaviorSubject<Boolean> = BehaviorSubject.create()
-    
-    var shouldContinue = true
-    
-    var lifecycleObservable: Observable<ActivityEvent>? = null
-        set(value) {
-            field = value
-            value?.subscribe { currLifecycle = it }
-        }
-    
-    var currLifecycle: ActivityEvent = ActivityEvent.PAUSE
-    
+    val baseUserBallRadius = dip(30)
+    var userBallRadius = baseUserBallRadius
+    val defaultStrokeWidth = dip(10)
+//    var userBallStroke = defaultStrokeWidth
     
     val userPoint = PointF(0f, 0f)
     var userPointVelocity = 0.0
-    var userPointAcceleration = 0.0
     val userPointVelocityObservable: Observable<Double>
+    
+    val userBall = Ball(0, userPoint, baseUserBallRadius.toFloat(), Observable.just(defaultStrokeWidth.toFloat()))
     
     init {
         Observables.userPointSubject
@@ -131,6 +115,11 @@ class CircleView : View, AnkoLogger,Disposable {
                     object {
                         val newUserVelocity = it.toDouble()
                         val newUserBallRadius = (baseUserBallRadius - newUserVelocity).toInt().coerceAtLeast(dip(1))
+                        val newUserStroke = if (newUserBallRadius == dip(1)) {
+                            0
+                        } else {
+                            defaultStrokeWidth
+                        }
                     }
                 }
                 .observeOn(AndroidSchedulers.mainThread())
@@ -141,7 +130,29 @@ class CircleView : View, AnkoLogger,Disposable {
                 .addToDisposables()
     }
     
-    inner class Ball(val id: Int = 1, val y: Int, val radius: Long = dip(25).toLong(), x: Long? = null) : Renderable {
+    
+    val dp = dip(1)
+    val maxDiagonalDistance by lazy { sqrt(pow(dip(measuredHeight).toDouble(), 2.0) + pow(dip(measuredWidth).toDouble(), 2.0)) }
+    
+    //    val currPointSubject = BehaviorSubject.create<MotionEvent>()!!
+    val score = AtomicInteger(0)
+    
+    val ballsObservable = PublishSubject.create<Ball>()!!
+    val ballDisposalSubject: BehaviorSubject<Int> = BehaviorSubject.create<Int>()
+    
+    val userBallOverlapSubject: BehaviorSubject<Boolean> = BehaviorSubject.create()
+    
+    var shouldContinue = true
+    
+    var lifecycleObservable: Observable<ActivityEvent>? = null
+        set(value) {
+            field = value
+            value?.subscribe { currLifecycle = it }
+        }
+    
+    var currLifecycle: ActivityEvent = ActivityEvent.PAUSE
+    
+    inner class Ball(val id: Int = 1, val y: Int, val radius: Long = dip(25).toLong(), x: Long? = null, val strokeWidth: Int = defaultStrokeWidth) : Renderable {
         val minTime = (1000000000L * (Math.log10(id.toDouble()))).toLong()
         val maxTime = (3000000000L * (Math.log10(id.toDouble()))).toLong()
         
@@ -200,7 +211,7 @@ class CircleView : View, AnkoLogger,Disposable {
         fun isIntersecting(another: Ball): Boolean {
             val distanceXS = Math.pow((x.get() - another.x.get()).toDouble(), 2.0)
             val distanceYS = Math.pow((y - another.y).toDouble(), 2.0)
-            val radiiS = Math.pow(((radius + stroke / 2) + (another.radius + stroke / 2)).toDouble(), 2.0)
+            val radiiS = Math.pow(((radius + defaultStrokeWidth / 2) + (another.radius + defaultStrokeWidth / 2)).toDouble(), 2.0)
             return distanceXS + distanceYS <= (radiiS)
         }
     }
@@ -234,7 +245,7 @@ class CircleView : View, AnkoLogger,Disposable {
         ballsObservable
                 .subscribe { Subjects.refresh.onNext(Unit) }
                 .addToDisposables()
-    
+        
         refresher = Subjects.refresh
                 .subscribeOn(newThread())
                 .sample(1, TimeUnit.MILLISECONDS)
@@ -244,7 +255,7 @@ class CircleView : View, AnkoLogger,Disposable {
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeWith(refreshFlowableObserver)
                 .addToDisposables()
-    
+        
         val timer = Observable.interval(250, TimeUnit.MILLISECONDS)
                 .filter { shouldContinue }
                 .map(Long::toInt)
@@ -254,7 +265,7 @@ class CircleView : View, AnkoLogger,Disposable {
                 .map { it + 2 }
                 .subscribe({ ballsObservable.onNext(Ball(it, randY)) }, Throwable::printStackTrace)
                 .addToDisposables()
-    
+        
         ballDisposalSubject
                 .observeOn(newThread())
                 .flatMapIterable { ballId ->
@@ -266,7 +277,7 @@ class CircleView : View, AnkoLogger,Disposable {
                     System.gc()
                 }
                 .addToDisposables()
-    
+        
         ballsObservable
                 .subscribeOn(newThread())
                 .observeOn(newThread())
@@ -280,7 +291,7 @@ class CircleView : View, AnkoLogger,Disposable {
                     }
                 }
                 .addToDisposables()
-    
+        
         Observable.interval(1, TimeUnit.MILLISECONDS)
 //                .delay(1, TimeUnit.MILLISECONDS)
                 .filter { !(userBallOverlapSubject.value ?: false) }
@@ -298,13 +309,13 @@ class CircleView : View, AnkoLogger,Disposable {
                     userBallOverlapSubject.onNext(overlap)
                 }
                 .addToDisposables()
-    
+        
         userBallOverlapSubject
                 .observeOn(single())
                 .filter { it }
                 .subscribe { Paints.userCirclePaint = Paints.overlapPaint }
                 .addToDisposables()
-    
+        
     }
     
     fun nearestNullIndex(): Int {
@@ -334,10 +345,15 @@ class CircleView : View, AnkoLogger,Disposable {
                     .forEach {
                         it?.render(canvas)
                     }
-            drawCircle(userPoint.x, userPoint.y, userBallRadius.toFloat(), Paints.userCirclePaint)
+            userBall.render(canvas)
+//            drawCircle(userPoint.x, userPoint.y, userBallRadius.toFloat(), Paints.userCirclePaint)
             bottomLeftText.render(canvas)
         }
         refreshFlowableObserver.requestMore(1)
+    }
+    
+    override fun getLayerType(): Int {
+        return LAYER_TYPE_HARDWARE
     }
     
 }

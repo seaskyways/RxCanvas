@@ -12,4 +12,3 @@ inline fun <reified T : Any> T.className(): String
 fun <T, R> WeakReference<T>.safe(body: T.() -> R?): R? {
     return this.get()?.body()
 }
-

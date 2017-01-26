@@ -8,6 +8,7 @@ import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.subscribers.DisposableSubscriber
 import org.jetbrains.anko.alert
 import org.jetbrains.anko.find
+import seaskyways.rxcanvas.circle.CircleView
 
 class MainActivity : RxActivity() {
     

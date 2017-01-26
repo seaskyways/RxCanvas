@@ -6,7 +6,7 @@
     android:layout_height="match_parent"
     tools:context="seaskyways.rxcanvas.MainActivity">
 
-    <seaskyways.rxcanvas.CircleView
+    <seaskyways.rxcanvas.circle.CircleView
         android:id="@+id/circle_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
