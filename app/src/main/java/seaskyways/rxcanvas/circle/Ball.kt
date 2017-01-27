@@ -13,11 +13,12 @@ import seaskyways.rxcanvas.Renderable
  */
 open class Ball(
         val id: Int,
-        val center: PointF,
+        val center: PointF = PointF(),
         var radius: Float,
         var strokeWidth: Float,
         val minimumRadius: Float = 0f,
-        val minimumStrokeWidth : Float = 5f
+        val minimumStrokeWidth: Float = 5f,
+        val isDynamic: Boolean = false
 ) : Renderable, Disposable {
     val disposables = CompositeDisposable()
     
@@ -41,17 +42,19 @@ open class Ball(
     val baseStrokeWidth = strokeWidth
     
     init {
-        disposables.add(
-                velocitySubject
-                        .subscribeOn(Schedulers.newThread())
-                        .subscribe { newVelocity ->
-                            radius = ((baseRadius - newVelocity).toFloat().coerceAtLeast(minimumRadius))
-                            if (radius == minimumRadius) {
-                                strokeWidth = (baseStrokeWidth - radius).coerceAtLeast(minimumStrokeWidth)
-                                ballPaint.value.strokeWidth = strokeWidth
+        if (isDynamic) {
+            disposables.add(
+                    velocitySubject
+                            .subscribeOn(Schedulers.newThread())
+                            .subscribe { newVelocity ->
+                                radius = ((baseRadius - newVelocity).toFloat().coerceAtLeast(minimumRadius))
+                                if (radius == minimumRadius) {
+                                    strokeWidth = (baseStrokeWidth - radius).coerceAtLeast(minimumStrokeWidth)
+                                    ballPaint.value.strokeWidth = strokeWidth
+                                }
                             }
-                        }
-        )
+            )
+        }
     }
     
     fun updateVelocity(p: PointF, userVelocityRefreshRate: Long, ctx: Context, shouldUpdatePosition: Boolean = true) = with(ctx) {

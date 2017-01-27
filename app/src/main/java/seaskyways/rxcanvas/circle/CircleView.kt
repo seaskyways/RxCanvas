@@ -13,10 +13,9 @@ import io.reactivex.schedulers.Schedulers.*
 import io.reactivex.subjects.*
 import io.reactivex.subscribers.DisposableSubscriber
 import org.jetbrains.anko.*
+import org.reactivestreams.*
 import seaskyways.rxcanvas.*
 import seaskyways.rxcanvas.Renderable.Companion.rederable
-import java.lang.Math.pow
-import java.lang.Math.sqrt
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.*
 
@@ -36,6 +35,7 @@ class CircleView : View, AnkoLogger, Disposable {
     
     private val Subjects = object {
         val refresh = PublishSubject.create<Unit>()!!
+        val userPoint = PublishSubject.create<PointF>()
     }
     private val Paints = object {
         val textPaint = Paint().apply {
@@ -71,7 +71,6 @@ class CircleView : View, AnkoLogger, Disposable {
         }
     }
     private val Observables = object {
-        val userPointSubject = PublishSubject.create<PointF>()
     }
     
     override fun isDisposed(): Boolean {
@@ -85,23 +84,33 @@ class CircleView : View, AnkoLogger, Disposable {
     val baseUserBallRadius by lazy { dip(30) }
     val defaultStrokeWidth by lazy { dip(10) }
     
-    val userBall by lazy { Ball(0, PointF(), baseUserBallRadius.toFloat(), defaultStrokeWidth.toFloat()) }
-    
-    init {
-        val userVelocityRefreshRate = 10L
-        Observables.userPointSubject
-                .subscribeOn(Schedulers.single())
-                .sample(userVelocityRefreshRate, TimeUnit.MILLISECONDS)
-                .subscribe {
-                    userBall.updateVelocity(it, userVelocityRefreshRate, ctx = context)
-                }
+    val userBall by lazy {
+        Ball(
+                id = 0,
+                radius = baseUserBallRadius.toFloat(),
+                strokeWidth = defaultStrokeWidth.toFloat(),
+                isDynamic = true
+        )
     }
     
+    init {
+        val userVelocityRefreshRate = 15L
+        Subjects.userPoint
+                .subscribeOn(Schedulers.computation())
+                .toFlowable(BackpressureStrategy.DROP)
+                .sample(userVelocityRefreshRate, TimeUnit.MILLISECONDS)
+                .onTerminateDetach()
+                .subscribeWith(object : DisposableSubscriber<PointF>(){
+                    override fun onError(t: Throwable?) = TODO()
+                    override fun onComplete() = TODO()
+                    override fun onNext(it: PointF) {
+                        userBall.updateVelocity(it, userVelocityRefreshRate, ctx = context)
+                        request(2)
+                    }
+                })
+                .addToDisposables()
+    }
     
-    val dp = dip(1)
-    val maxDiagonalDistance by lazy { sqrt(pow(dip(measuredHeight).toDouble(), 2.0) + pow(dip(measuredWidth).toDouble(), 2.0)) }
-    
-    //    val currPointSubject = BehaviorSubject.create<MotionEvent>()!!
     val score = AtomicInteger(0)
     
     val ballsObservable = PublishSubject.create<Ball>()!!
@@ -297,8 +306,26 @@ class CircleView : View, AnkoLogger, Disposable {
         canvas.drawText("Score : ${score.get()}", 50f, measuredHeight.toFloat() - 50, Paints.bottomLeftText)
     }
     
+    private val pointsManager = object {
+        private var index = 0
+        private val arbitraryPoints = Array(20) { PointF() }
+        
+        fun getAndMoveToNext(): PointF {
+            val p = arbitraryPoints[index]
+            index++
+            if (index == arbitraryPoints.size) index = 0
+            return p
+        }
+        
+        fun setAndGet(x: Float, y: Float) =
+                getAndMoveToNext().also {
+                    it.x = x
+                    it.y = y
+                }
+    }
+    
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        Observables.userPointSubject.onNext(PointF(event.x, event.y))
+        Subjects.userPoint.onNext(pointsManager.setAndGet(event.x, event.y))
         return true
     }
     
