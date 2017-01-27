@@ -54,7 +54,6 @@ class AnimatableBall(
     
     override fun render(canvas: Canvas) {
         super.render(canvas)
-        
     }
     
     override fun isRunning() = isAnimating

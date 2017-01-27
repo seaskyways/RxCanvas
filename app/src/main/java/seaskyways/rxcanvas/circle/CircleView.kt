@@ -13,7 +13,6 @@ import io.reactivex.schedulers.Schedulers.*
 import io.reactivex.subjects.*
 import io.reactivex.subscribers.DisposableSubscriber
 import org.jetbrains.anko.*
-import org.reactivestreams.*
 import seaskyways.rxcanvas.*
 import seaskyways.rxcanvas.Renderable.Companion.rederable
 import java.util.concurrent.TimeUnit
@@ -30,8 +29,7 @@ class CircleView : View, AnkoLogger, Disposable {
     constructor(context: Context?, attrs: AttributeSet?, defStyleAttr: Int) : super(context, attrs, defStyleAttr)
     
     private val disposables = CompositeDisposable()
-    private fun Disposable.addToDisposables() = apply { disposables.add(this) }
-    
+    private fun Disposable.addToDisposables() = addToDisposables(disposables)
     
     private val Subjects = object {
         val refresh = PublishSubject.create<Unit>()!!
@@ -70,8 +68,6 @@ class CircleView : View, AnkoLogger, Disposable {
             }
         }
     }
-    private val Observables = object {
-    }
     
     override fun isDisposed(): Boolean {
         return disposables.isDisposed
@@ -100,7 +96,7 @@ class CircleView : View, AnkoLogger, Disposable {
                 .toFlowable(BackpressureStrategy.DROP)
                 .sample(userVelocityRefreshRate, TimeUnit.MILLISECONDS)
                 .onTerminateDetach()
-                .subscribeWith(object : DisposableSubscriber<PointF>(){
+                .subscribeWith(object : DisposableSubscriber<PointF>() {
                     override fun onError(t: Throwable?) = TODO()
                     override fun onComplete() = TODO()
                     override fun onNext(it: PointF) {
@@ -113,7 +109,7 @@ class CircleView : View, AnkoLogger, Disposable {
     
     val score = AtomicInteger(0)
     
-    val ballsObservable = PublishSubject.create<Ball>()!!
+    val ballsObservable = PublishSubject.create<OldBall>()!!
     val ballDisposalSubject: BehaviorSubject<Int> = BehaviorSubject.create<Int>()
     
     val userBallOverlapSubject: BehaviorSubject<Boolean> = BehaviorSubject.create()
@@ -128,7 +124,7 @@ class CircleView : View, AnkoLogger, Disposable {
     
     var currLifecycle: ActivityEvent = ActivityEvent.PAUSE
     
-    inner class Ball(val id: Int = 1, val y: Int, val radius: Long = dip(25).toLong(), x: Long? = null, val strokeWidth: Int = defaultStrokeWidth) : Renderable {
+    inner class OldBall(val id: Int = 1, val y: Int, val radius: Long = dip(25).toLong(), x: Long? = null, val strokeWidth: Int = defaultStrokeWidth) : Renderable {
         val minTime = (1000000000L * (Math.log10(id.toDouble()))).toLong()
         val maxTime = (3000000000L * (Math.log10(id.toDouble()))).toLong()
         
@@ -179,15 +175,15 @@ class CircleView : View, AnkoLogger, Disposable {
         
         override fun render(canvas: Canvas) {
             canvas.drawCircle(this.x.get().toFloat(), this.y.toFloat(), radius.toFloat(), Paints.circlePaint)
-            canvas.drawText(currentBalls.indexOf(this@Ball).toString(), this.x.get().toFloat(), this.y.toFloat() + this.idTextBox.height() / 2, Paints.textPaint)
+            canvas.drawText(currentBalls.indexOf(this@OldBall).toString(), this.x.get().toFloat(), this.y.toFloat() + this.idTextBox.height() / 2, Paints.textPaint)
             if (!this.isAnimating && !this.canDispose)
                 this.startAnim()
         }
         
-        fun isIntersecting(another: Ball): Boolean {
+        fun isIntersecting(another: OldBall): Boolean {
             val distanceXS = Math.pow((x.get() - another.x.get()).toDouble(), 2.0)
             val distanceYS = Math.pow((y - another.y).toDouble(), 2.0)
-            val radiiS = Math.pow(((radius + defaultStrokeWidth / 2) + (another.radius + defaultStrokeWidth / 2)).toDouble(), 2.0)
+            val radiiS = Math.pow(((radius + strokeWidth / 2) + (another.radius + another.strokeWidth / 2)).toDouble(), 2.0)
             return distanceXS + distanceYS <= (radiiS)
         }
     }
@@ -196,7 +192,7 @@ class CircleView : View, AnkoLogger, Disposable {
     
     val refresher: Flowable<Unit>
     
-    val currentBalls = AtomicArray<Ball?>(45)
+    val currentBalls = AtomicArray<OldBall?>(45)
     
     private val refreshFlowableObserver = object : DisposableSubscriber<Unit>() {
         fun requestMore(x: Int) = request(x.toLong())
@@ -239,7 +235,7 @@ class CircleView : View, AnkoLogger, Disposable {
         timer
                 .observeOn(computation())
                 .map { it + 2 }
-                .subscribe({ ballsObservable.onNext(Ball(it, randY)) }, Throwable::printStackTrace)
+                .subscribe({ ballsObservable.onNext(OldBall(it, randY)) }, Throwable::printStackTrace)
                 .addToDisposables()
         
         ballDisposalSubject
@@ -276,7 +272,7 @@ class CircleView : View, AnkoLogger, Disposable {
                     val overlap = currentBalls
                             .indexOfFirst {
                                 it?.isIntersecting(
-                                        Ball(
+                                        OldBall(
                                                 y = userBall.center.y.toInt(),
                                                 x = userBall.center.x.toLong(),
                                                 radius = userBall.radius.toLong()
@@ -289,7 +285,7 @@ class CircleView : View, AnkoLogger, Disposable {
         userBallOverlapSubject
                 .observeOn(single())
                 .filter { it }
-                .subscribe { Paints.userCirclePaint.set(Paints.overlapPaint) }
+                .subscribe { userBall.ballPaint.value.set(Paints.overlapPaint) }
                 .addToDisposables()
         
     }
@@ -308,8 +304,12 @@ class CircleView : View, AnkoLogger, Disposable {
     
     private val pointsManager = object {
         private var index = 0
+            @Synchronized get
+            @Synchronized set
+        
         private val arbitraryPoints = Array(20) { PointF() }
         
+        @Synchronized
         fun getAndMoveToNext(): PointF {
             val p = arbitraryPoints[index]
             index++
@@ -317,6 +317,7 @@ class CircleView : View, AnkoLogger, Disposable {
             return p
         }
         
+        @Synchronized
         fun setAndGet(x: Float, y: Float) =
                 getAndMoveToNext().also {
                     it.x = x

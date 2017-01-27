@@ -5,8 +5,8 @@ import android.graphics.*
 import io.reactivex.disposables.*
 import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.BehaviorSubject
-import org.jetbrains.anko.dip
-import seaskyways.rxcanvas.Renderable
+import org.jetbrains.anko.*
+import seaskyways.rxcanvas.*
 
 /**
  * Created by Ahmad on 26/01 Jan/2017.
@@ -26,7 +26,7 @@ open class Ball(
         Paint().also {
             it.style = Paint.Style.STROKE
             it.strokeWidth = strokeWidth
-            it.color = Color.BLACK
+            it.color = Color.GREEN
         }
     }
     
@@ -43,17 +43,20 @@ open class Ball(
     
     init {
         if (isDynamic) {
-            disposables.add(
-                    velocitySubject
-                            .subscribeOn(Schedulers.newThread())
-                            .subscribe { newVelocity ->
-                                radius = ((baseRadius - newVelocity).toFloat().coerceAtLeast(minimumRadius))
-                                if (radius == minimumRadius) {
-                                    strokeWidth = (baseStrokeWidth - radius).coerceAtLeast(minimumStrokeWidth)
-                                    ballPaint.value.strokeWidth = strokeWidth
-                                }
-                            }
-            )
+            velocitySubject
+                    .subscribeOn(Schedulers.newThread())
+                    .map { it * 4.0 }
+                    .subscribe { newVelocity ->
+                        radius = (baseRadius - newVelocity).toFloat().coerceAtLeast(minimumRadius)
+                        if (radius == minimumRadius) {
+                            strokeWidth = (baseStrokeWidth - radius).coerceAtLeast(minimumStrokeWidth)
+                            ballPaint.value.strokeWidth = strokeWidth
+                        }else{
+                            strokeWidth = baseStrokeWidth
+                            ballPaint.value.strokeWidth = strokeWidth
+                        }
+                    }
+                    .addToDisposables(disposables)
         }
     }
     
