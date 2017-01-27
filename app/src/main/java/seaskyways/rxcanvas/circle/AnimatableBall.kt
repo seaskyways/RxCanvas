@@ -48,7 +48,7 @@ class AnimatableBall(
             Observable.interval(Defaults.getRandomTimeIntervalFromEmissions(), TimeUnit.NANOSECONDS)
                     .subscribeOn(Schedulers.newThread())
                     .filter { isAnimating }
-                    .map { 0.001 }
+                    .map { 1.0 / Defaults.numberOfAnimationEmissions }
                     .scan(Double::plus)
                     .map { 1 - it }
                     .takeWhile { it > 0 }
