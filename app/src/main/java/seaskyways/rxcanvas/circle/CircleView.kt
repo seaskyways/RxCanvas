@@ -50,18 +50,24 @@ class CircleView : View, AnkoLogger, Disposable {
         }
         
         
-        val circlePaint = Paint().apply {
-            color = Color.BLACK
-            style = Paint.Style.STROKE
-            strokeWidth = defaultStrokeWidth.toFloat()
+        val circlePaint by lazy {
+            Paint().apply {
+                color = Color.BLACK
+                style = Paint.Style.STROKE
+                strokeWidth = defaultStrokeWidth.toFloat()
+            }
         }
         
-        var userCirclePaint = Paint(circlePaint).apply {
-            color = Color.GREEN
+        val userCirclePaint by lazy {
+            Paint(circlePaint).apply {
+                color = Color.GREEN
+            }
         }
         
-        val overlapPaint = Paint(circlePaint).apply {
-            color = Color.RED
+        val overlapPaint by lazy {
+            Paint(circlePaint).apply {
+                color = Color.RED
+            }
         }
     }
     private val Observables = object {
@@ -76,58 +82,19 @@ class CircleView : View, AnkoLogger, Disposable {
         disposables.dispose()
     }
     
-    val baseUserBallRadius = dip(30)
-    var userBallRadius = baseUserBallRadius
-    val defaultStrokeWidth = dip(10)
-//    var userBallStroke = defaultStrokeWidth
+    val baseUserBallRadius by lazy { dip(30) }
+    val defaultStrokeWidth by lazy { dip(10) }
     
-    val userPoint = PointF(0f, 0f)
-    var userPointVelocity = 0.0
-    val userPointVelocityObservable: Observable<Double>
-    
-    val userBall = Ball(0, userPoint, baseUserBallRadius.toFloat(), Observable.just(defaultStrokeWidth.toFloat()))
+    val userBall by lazy { Ball(0, PointF(), baseUserBallRadius.toFloat(), defaultStrokeWidth.toFloat()) }
     
     init {
+        val userVelocityRefreshRate = 10L
         Observables.userPointSubject
-                .subscribeOn(Schedulers.newThread())
-                .sample(9, TimeUnit.MILLISECONDS)
-                .observeOn(AndroidSchedulers.mainThread())
-                .subscribe { userPoint.set(it.x, it.y) }
-                .addToDisposables()
-        
-        
-        val userVelocityRefreshRate = 3L
-        userPointVelocityObservable = Observables.userPointSubject
-                .observeOn(Schedulers.computation())
+                .subscribeOn(Schedulers.single())
                 .sample(userVelocityRefreshRate, TimeUnit.MILLISECONDS)
-                .buffer(2)
-                .map {
-                    val dx = dip(it[1].x - it[0].x)
-                    val dy = dip(it[1].y - it[0].y)
-                    Math.sqrt((dx * dx + dy * dy).toDouble()) / userVelocityRefreshRate
-                }
-//
-        userPointVelocityObservable
-                .observeOn(computation())
-                .map { (it / maxDiagonalDistance) * 6000 }
-                .filter { (it == 0.0) or (it > 1) }
-                .map {
-                    object {
-                        val newUserVelocity = it.toDouble()
-                        val newUserBallRadius = (baseUserBallRadius - newUserVelocity).toInt().coerceAtLeast(dip(1))
-                        val newUserStroke = if (newUserBallRadius == dip(1)) {
-                            0
-                        } else {
-                            defaultStrokeWidth
-                        }
-                    }
-                }
-                .observeOn(AndroidSchedulers.mainThread())
                 .subscribe {
-                    userPointVelocity = it.newUserVelocity
-                    userBallRadius = it.newUserBallRadius
+                    userBall.updateVelocity(it, userVelocityRefreshRate, ctx = context)
                 }
-                .addToDisposables()
     }
     
     
@@ -301,9 +268,9 @@ class CircleView : View, AnkoLogger, Disposable {
                             .indexOfFirst {
                                 it?.isIntersecting(
                                         Ball(
-                                                y = userPoint.y.toInt(),
-                                                x = userPoint.x.toLong(),
-                                                radius = userBallRadius.toLong()
+                                                y = userBall.center.y.toInt(),
+                                                x = userBall.center.x.toLong(),
+                                                radius = userBall.radius.toLong()
                                         )) ?: false
                             } != -1
                     userBallOverlapSubject.onNext(overlap)
@@ -313,7 +280,7 @@ class CircleView : View, AnkoLogger, Disposable {
         userBallOverlapSubject
                 .observeOn(single())
                 .filter { it }
-                .subscribe { Paints.userCirclePaint = Paints.overlapPaint }
+                .subscribe { Paints.userCirclePaint.set(Paints.overlapPaint) }
                 .addToDisposables()
         
     }

@@ -17,11 +17,11 @@ class AnimatableBall(
         id: Int,
         center: PointF,
         radius: Float,
-        strokeWidthObservable: Observable<Float>,
+        strokeWidth: Float,
         animationField: Rect,
         val isRtl: Boolean = false,
         context: Context? = null
-) : Ball(id, center, radius, strokeWidthObservable), Animatable {
+) : Ball(id, center, radius, strokeWidth), Animatable {
     object Defaults {
         const val minTime = 1_000_000_000L /*NANOSECONDS*/
         const val maxTime = 3_000_000_000L
@@ -68,7 +68,8 @@ class AnimatableBall(
                 .subscribe(
                         {
                             center.set(it, center.y)
-                        },
+                        }
+                        ,
                         Throwable::printStackTrace
                         ,
                         {

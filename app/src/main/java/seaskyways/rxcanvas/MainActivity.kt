@@ -1,28 +1,29 @@
 package seaskyways.rxcanvas
 
 import android.os.Bundle
+import android.widget.FrameLayout
 import com.trello.rxlifecycle2.android.ActivityEvent
 import com.trello.rxlifecycle2.components.RxActivity
 import io.reactivex.BackpressureStrategy
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.subscribers.DisposableSubscriber
-import org.jetbrains.anko.alert
-import org.jetbrains.anko.find
+import org.jetbrains.anko.*
 import seaskyways.rxcanvas.circle.CircleView
 
 class MainActivity : RxActivity() {
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        startLogic(true)
+        setContentView(R.layout.activity_main)
+        val frame: FrameLayout = find(R.id.activity_main)
+        
+        startLogic(frame, true)
         
     }
     
-    fun startLogic(isOnCreate : Boolean = false) {
-        if (!isOnCreate) find<CircleView>(R.id.circle_view).dispose()
-        setContentView(R.layout.activity_main)
-        
-        val circleView = find<CircleView>(R.id.circle_view)
+    fun startLogic(parentView: FrameLayout, isOnCreate: Boolean = false) {
+        val circleView = CircleView(ctx)
+        parentView.addView(circleView, matchParent, matchParent)
         
         circleView.lifecycleObservable = lifecycle()
         lifecycle()
@@ -48,11 +49,12 @@ class MainActivity : RxActivity() {
                     override fun onNext(t: Boolean?) {
                         alert("Restart Game ?") {
                             okButton {
+                                circleView.dispose()
                                 circleView.shouldContinue = true
                                 circleView.userBallOverlapSubject.onComplete()
-                                startLogic()
+                                parentView.removeView(circleView)
+                                startLogic(parentView)
                                 request(1)
-                                
                             }
                             noButton()
                             show()
