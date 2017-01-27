@@ -16,6 +16,17 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            applicationVariants.all { variant ->
+                variant.outputs.each { output ->
+                    def date = new Date();
+                    def formattedDate = date.format('yyyy_MM_dd_hh_mm')
+                    output.outputFile = new File(output.outputFile.parent,
+                            output.outputFile.name.replace("app-release", "avoid-V${variant.versionName}-date-" + formattedDate)
+                            //for Debug use output.outputFile = new File(output.outputFile.parent,
+                            //                             output.outputFile.name.replace("-debug", "-" + formattedDate)
+                    )
+                }
+            }
         }
     }
     sourceSets {
@@ -35,7 +46,7 @@ dependencies {
     compile 'io.reactivex.rxjava2:rxjava:2.0.4'
     compile 'io.reactivex.rxjava2:rxandroid:2.0.1'
     compile "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
-    compile 'org.jetbrains.anko:anko-sdk23:0.9'
+    compile 'org.jetbrains.anko:anko-sdk19:0.9'
     compile 'com.trello.rxlifecycle2:rxlifecycle:2.0.1'
     compile 'com.trello.rxlifecycle2:rxlifecycle-android:2.0.1'
     compile 'com.trello.rxlifecycle2:rxlifecycle-components:2.0.1'

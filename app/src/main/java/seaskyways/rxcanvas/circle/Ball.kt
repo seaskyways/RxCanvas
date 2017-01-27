@@ -5,7 +5,7 @@ import android.graphics.*
 import io.reactivex.disposables.*
 import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.BehaviorSubject
-import org.jetbrains.anko.*
+import org.jetbrains.anko.dip
 import seaskyways.rxcanvas.*
 
 /**
@@ -51,7 +51,7 @@ open class Ball(
                         if (radius == minimumRadius) {
                             strokeWidth = (baseStrokeWidth - radius).coerceAtLeast(minimumStrokeWidth)
                             ballPaint.value.strokeWidth = strokeWidth
-                        }else{
+                        } else {
                             strokeWidth = baseStrokeWidth
                             ballPaint.value.strokeWidth = strokeWidth
                         }
@@ -76,4 +76,11 @@ open class Ball(
     
     override fun isDisposed() = disposables.isDisposed
     override fun dispose() = disposables.dispose()
+    
+    fun isIntersecting(another: Ball): Boolean {
+        val distanceXS = Math.pow((center.x - another.center.x).toDouble(), 2.0)
+        val distanceYS = Math.pow((center.y - another.center.y).toDouble(), 2.0)
+        val radiiS = Math.pow(((radius + strokeWidth / 2) + (another.radius + another.strokeWidth / 2)).toDouble(), 2.0)
+        return distanceXS + distanceYS <= (radiiS)
+    }
 }

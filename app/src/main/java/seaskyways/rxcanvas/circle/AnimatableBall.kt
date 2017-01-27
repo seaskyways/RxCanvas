@@ -39,10 +39,15 @@ class AnimatableBall(
     
     val xExtremity = animationField.width() + radius
     
+    var _doOnNext: (() -> Unit)? = null
+    fun doOnNext(b: () -> Unit) {
+        _doOnNext = b
+    }
+    
     val animationObservable: ConnectableObservable<Double> =
             Observable.interval(Defaults.getRandomTimeIntervalFromEmissions(), TimeUnit.NANOSECONDS)
                     .subscribeOn(Schedulers.newThread())
-                    .filter { !canDispose }
+                    .filter { isAnimating }
                     .map { 0.001 }
                     .scan(Double::plus)
                     .map { 1 - it }
@@ -51,6 +56,12 @@ class AnimatableBall(
                     .map { (xExtremity) * it - (radius / 2) }
                     .publish()
     
+    override val ballPaint: Lazy<Paint> = lazy {
+        super.ballPaint.value.also {
+            it.color = Color.BLACK
+            it.xfermode = PorterDuffXfermode(PorterDuff.Mode.XOR)
+        }
+    }
     
     override fun render(canvas: Canvas) {
         super.render(canvas)
@@ -60,23 +71,18 @@ class AnimatableBall(
     
     override fun start() {
         if (isRunning || canDispose) return
-        
         isAnimating = true
+        
         val disposable = animationObservable
                 .map(Double::toFloat)
                 .subscribe(
                         {
                             center.set(it, center.y)
+                            _doOnNext?.invoke()
                         }
-                        ,
-                        Throwable::printStackTrace
-                        ,
-                        {
-                            stop()
-                            dispose()
-//                            score.incrementAndGet()
-//                            ballDisposalSubject.onNext(id)
-                        })
+                        , Throwable::printStackTrace
+                        , this::dispose
+                )
         animationObservable.connect()
         disposables.add(disposable)
     }
@@ -93,6 +99,8 @@ class AnimatableBall(
     
     override fun dispose() {
         super.dispose()
+        stop()
+        _onDispose?.invoke()
     }
     
 }
