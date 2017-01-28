@@ -94,8 +94,8 @@ open class Ball(
     override fun dispose() = disposables.dispose()
     
     fun isIntersecting(another: Ball): Boolean {
-        val distanceXS = pow((center.x - another.center.x).toDouble(), 2.0)
-        val distanceYS = pow((center.y - another.center.y).toDouble(), 2.0)
+        val distanceXS = (center.x - another.center.x) power 2
+        val distanceYS = (center.y - another.center.y) power 2
         val radiiS = pow(((radius + strokeWidth / 4) + (another.radius + another.strokeWidth / 4)).toDouble(), 2.0)
         return distanceXS + distanceYS <= (radiiS)
     }

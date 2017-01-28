@@ -192,28 +192,29 @@ class CircleView : View, AnkoLogger, Disposable {
                 .subscribeWith(refreshFlowableObserver)
                 .addToDisposables()
         
-        val timer = Observable.interval(250, TimeUnit.MILLISECONDS)
+        val timer = Observable
+                .defer { Observable.timer(250,TimeUnit.MILLISECONDS) }
+                .repeatUntil { userBallOverlapSubject.value ?: false }
+                .subscribeOn(newThread())
+                .map { 1 }
+                .scan(Int::plus)
                 .filter { shouldContinue }
-                .map(Long::toInt)
         
         val bounds by lazy { Rect(0, 0, measuredWidth, measuredHeight) }
         timer
-                .observeOn(computation())
-                .map { it + 2 }
-                .subscribe({
-                    ballsObservable.onNext(
-                            AnimatableBall(
-                                    it,
-                                    PointF(measuredWidth.toFloat(), randY.toFloat()),
-                                    radius = dip(25).toFloat(),
-                                    strokeWidth = defaultStrokeWidth.toFloat(),
-                                    animationField = bounds,
-                                    context = context
-                            ).also {
-                                it.setCurrentPositionSubject(Subjects.circlesPositionSubject)
-                            }
+                .observeOn(newThread())
+                .map {
+                    AnimatableBall(
+                            id = it,
+                            center = PointF(measuredWidth.toFloat(), randY.toFloat()),
+                            radius = dip(25).toFloat(),
+                            strokeWidth = defaultStrokeWidth.toFloat(),
+                            animationField = bounds,
+                            context = context
                     )
-                }, Throwable::printStackTrace)
+                }
+                .doOnNext { it.setCurrentPositionSubject(Subjects.circlesPositionSubject) }
+                .subscribe(ballsObservable::onNext, Throwable::printStackTrace)
                 .addToDisposables()
         
         ballDisposalSubject

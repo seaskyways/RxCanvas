@@ -4,7 +4,6 @@ package seaskyways.rxcanvas
 
 import io.reactivex.disposables.*
 import java.lang.ref.WeakReference
-import java.util.concurrent.atomic.AtomicReferenceArray
 
 /**
  * Created by Ahmad on 15/01 Jan/2017.
@@ -17,3 +16,7 @@ inline fun <T, R> WeakReference<T>.safe(body: T.() -> R?): R? {
 }
 
 inline fun <T : Disposable> T.addToDisposables(compositeDisposable: CompositeDisposable) = compositeDisposable.add(this)
+
+fun Math.pow(x: Number, power: Number) = Math.pow(x.toDouble(), power.toDouble())
+
+infix fun Number.power(pow: Number) = Math.pow(this.toDouble(), pow.toDouble())

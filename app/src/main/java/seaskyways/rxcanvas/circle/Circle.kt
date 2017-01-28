@@ -7,8 +7,8 @@ import android.graphics.PointF
  */
 data class Circle(val center : PointF, val radius : Float, val id : Int? = null){
     fun contains(x : Number, y : Number) : Boolean{
-        val dx = center.x - x.toFloat()
-        val dy = center.y - y.toFloat()
+        val dx = Math.abs(center.x - x.toFloat())
+        val dy = Math.abs(center.y - y.toFloat())
         return dx <= radius && dy <= radius
     }
 }
