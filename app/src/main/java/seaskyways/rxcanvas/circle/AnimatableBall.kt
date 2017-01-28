@@ -12,7 +12,6 @@ import java.util.concurrent.TimeUnit
 /**
  * Created by Ahmad on 26/01 Jan/2017.
  */
-
 class AnimatableBall(
         id: Int,
         center: PointF,
@@ -23,11 +22,11 @@ class AnimatableBall(
         context: Context? = null
 ) : Ball(id, center, radius, strokeWidth), Animatable {
     object Defaults {
-        const val minTime = 1_000_000_000L /*NANOSECONDS*/
-        const val maxTime = 3_000_000_000L
-        const val numberOfAnimationEmissions = 1001 /*from 0 to 1000 inclusive*/
-        fun getRandTime(): Double = minTime + (Math.random() * (maxTime - minTime))
-        fun getRandomTimeIntervalFromEmissions() = (getRandTime() / numberOfAnimationEmissions).toLong().coerceAtLeast(1)
+        const val MIN_TIME = 1_000_000_000L /*NANOSECONDS*/
+        const val MAX_TIME = 3_000_000_000L
+        const val NUMBER_OF_ANIMATION_EMISSIONS = 600
+        fun getRandTime(): Double = MIN_TIME + (Math.random() * (MAX_TIME - MIN_TIME))
+        fun getRandomTimeIntervalFromEmissions(factor : Int = 1) = (getRandTime() * factor / NUMBER_OF_ANIMATION_EMISSIONS).toLong().coerceAtLeast(1)
     }
     
     val ctxRef = WeakReference(context)
@@ -39,16 +38,16 @@ class AnimatableBall(
     
     val xExtremity = animationField.width() + radius
     
-    var _doOnNext: (() -> Unit)? = null
+    private var _doOnNext: (() -> Unit)? = null
     fun doOnNext(b: () -> Unit) {
         _doOnNext = b
     }
     
     val animationObservable: ConnectableObservable<Double> =
-            Observable.interval(Defaults.getRandomTimeIntervalFromEmissions(), TimeUnit.NANOSECONDS)
+            Observable.interval(Defaults.getRandomTimeIntervalFromEmissions(Math.log10(id.toDouble()).toInt().coerceAtLeast(1)), TimeUnit.NANOSECONDS)
                     .subscribeOn(Schedulers.newThread())
                     .filter { isAnimating }
-                    .map { 1.0 / Defaults.numberOfAnimationEmissions }
+                    .map { 1.0 / Defaults.NUMBER_OF_ANIMATION_EMISSIONS }
                     .scan(Double::plus)
                     .map { 1 - it }
                     .takeWhile { it > 0 }
@@ -58,7 +57,7 @@ class AnimatableBall(
     
     override val ballPaint: Lazy<Paint> = lazy {
         super.ballPaint.value.also {
-            it.color = Color.BLACK
+            it.color = Color.WHITE
             it.xfermode = PorterDuffXfermode(PorterDuff.Mode.XOR)
         }
     }
@@ -79,6 +78,7 @@ class AnimatableBall(
                         {
                             center.set(it, center.y)
                             _doOnNext?.invoke()
+                            currentPositionSubject.onNext(Circle(center, radius, id))
                         }
                         , Throwable::printStackTrace
                         , this::dispose

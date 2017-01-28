@@ -4,9 +4,10 @@ import android.content.Context
 import android.graphics.*
 import io.reactivex.disposables.*
 import io.reactivex.schedulers.Schedulers
-import io.reactivex.subjects.BehaviorSubject
+import io.reactivex.subjects.*
 import org.jetbrains.anko.dip
 import seaskyways.rxcanvas.*
+import java.lang.Math.pow
 
 /**
  * Created by Ahmad on 26/01 Jan/2017.
@@ -37,6 +38,8 @@ open class Ball(
             velocitySubject.onNext(value)
         }
     
+    protected val currentPositionSubject: PublishSubject<Circle> = PublishSubject.create<Circle>()
+    val currentPositionObservable get() = currentPositionSubject.hide()
     
     val baseRadius = radius
     val baseStrokeWidth = strokeWidth
@@ -63,7 +66,9 @@ open class Ball(
     fun updateVelocity(p: PointF, userVelocityRefreshRate: Long, ctx: Context, shouldUpdatePosition: Boolean = true) = with(ctx) {
         val dx = dip(p.x - center.x)
         val dy = dip(p.y - center.y)
-        velocity = (Math.sqrt((dx * dx + dy * dy).toDouble()) / userVelocityRefreshRate)
+        val dx2 = dx * dx
+        val dy2 = dy * dy
+        velocity = (Math.sqrt((dx2 + dy2).toDouble()) / userVelocityRefreshRate)
         if (shouldUpdatePosition) updatePosition(p)
         return@with velocity
     }
@@ -78,9 +83,9 @@ open class Ball(
     override fun dispose() = disposables.dispose()
     
     fun isIntersecting(another: Ball): Boolean {
-        val distanceXS = Math.pow((center.x - another.center.x).toDouble(), 2.0)
-        val distanceYS = Math.pow((center.y - another.center.y).toDouble(), 2.0)
-        val radiiS = Math.pow(((radius + strokeWidth / 2) + (another.radius + another.strokeWidth / 2)).toDouble(), 2.0)
+        val distanceXS = pow((center.x - another.center.x).toDouble(), 2.0)
+        val distanceYS = pow((center.y - another.center.y).toDouble(), 2.0)
+        val radiiS = pow(((radius + strokeWidth / 4) + (another.radius + another.strokeWidth / 4)).toDouble(), 2.0)
         return distanceXS + distanceYS <= (radiiS)
     }
 }

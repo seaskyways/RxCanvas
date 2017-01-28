@@ -44,6 +44,7 @@ class CircleView : View, AnkoLogger, Disposable {
         
         val bottomLeftText = Paint(textPaint).apply {
             textAlign = Paint.Align.LEFT
+            color = Color.WHITE
             xfermode = PorterDuffXfermode(PorterDuff.Mode.XOR)
         }
         
@@ -53,12 +54,6 @@ class CircleView : View, AnkoLogger, Disposable {
                 color = Color.BLACK
                 style = Paint.Style.STROKE
                 strokeWidth = defaultStrokeWidth.toFloat()
-            }
-        }
-        
-        val userCirclePaint by lazy {
-            Paint(circlePaint).apply {
-                color = Color.GREEN
             }
         }
         
@@ -85,17 +80,21 @@ class CircleView : View, AnkoLogger, Disposable {
                 id = 0,
                 radius = baseUserBallRadius.toFloat(),
                 strokeWidth = defaultStrokeWidth.toFloat(),
-                isDynamic = true
+                isDynamic = true,
+                center = PointF(measuredWidth / 8f, measuredHeight / 2f)
         )
     }
+    val userBallRect by lazy { RectF() }
     
     init {
         val userVelocityRefreshRate = 15L
-        Subjects.userPoint
+        val sampledUserPoint = Subjects.userPoint
                 .subscribeOn(Schedulers.computation())
                 .toFlowable(BackpressureStrategy.DROP)
                 .sample(userVelocityRefreshRate, TimeUnit.MILLISECONDS)
                 .onTerminateDetach()
+        
+        sampledUserPoint
                 .subscribeWith(object : DisposableSubscriber<PointF>() {
                     override fun onError(t: Throwable?) = TODO()
                     override fun onComplete() = TODO()
@@ -105,6 +104,12 @@ class CircleView : View, AnkoLogger, Disposable {
                     }
                 })
                 .addToDisposables()
+        
+//        sampledUserPoint
+//                .observeOn(newThread())
+//                .subscribe {
+//
+//                }
     }
     
     val score = AtomicInteger(0)
@@ -125,10 +130,10 @@ class CircleView : View, AnkoLogger, Disposable {
     var currLifecycle: ActivityEvent = ActivityEvent.PAUSE
 
 //    inner class OldBall(val id: Int = 1, val y: Int, val radius: Long = dip(25).toLong(), x: Long? = null, val strokeWidth: Int = defaultStrokeWidth) : Renderable {
-//        val minTime = (1000000000L * (Math.log10(id.toDouble()))).toLong()
-//        val maxTime = (3000000000L * (Math.log10(id.toDouble()))).toLong()
+//        val MIN_TIME = (1000000000L * (Math.log10(id.toDouble()))).toLong()
+//        val MAX_TIME = (3000000000L * (Math.log10(id.toDouble()))).toLong()
 //
-//        fun getRandTime() = minTime + (Math.random() * (maxTime - minTime))
+//        fun getRandTime() = MIN_TIME + (Math.random() * (MAX_TIME - MIN_TIME))
 //        val timeWithDistance: Lazy<Long>
 //            get() = lazyOf((getRandTime() / 1001.0).toLong().coerceAtLeast(1))
 //
@@ -222,6 +227,12 @@ class CircleView : View, AnkoLogger, Disposable {
                 .subscribeOn(newThread())
                 .sample(1, TimeUnit.MILLISECONDS)
                 .toFlowable(BackpressureStrategy.DROP)
+                .onTerminateDetach()
+                .takeUntil(
+                        userBallOverlapSubject
+                                .toFlowable(BackpressureStrategy.MISSING)
+                                .filter { it }
+                )
         
         refresher
                 .observeOn(AndroidSchedulers.mainThread())
