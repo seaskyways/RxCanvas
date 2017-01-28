@@ -34,6 +34,7 @@ class CircleView : View, AnkoLogger, Disposable {
     private val Subjects = object {
         val refresh = PublishSubject.create<Unit>()!!
         val userPoint = PublishSubject.create<PointF>()
+        val circlesPositionSubject = PublishSubject.create<Circle>()
     }
     private val Paints = object {
         val textPaint = Paint().apply {
@@ -104,7 +105,7 @@ class CircleView : View, AnkoLogger, Disposable {
                     }
                 })
                 .addToDisposables()
-        
+
 //        sampledUserPoint
 //                .observeOn(newThread())
 //                .subscribe {
@@ -130,52 +131,10 @@ class CircleView : View, AnkoLogger, Disposable {
     var currLifecycle: ActivityEvent = ActivityEvent.PAUSE
 
 //    inner class OldBall(val id: Int = 1, val y: Int, val radius: Long = dip(25).toLong(), x: Long? = null, val strokeWidth: Int = defaultStrokeWidth) : Renderable {
-//        val MIN_TIME = (1000000000L * (Math.log10(id.toDouble()))).toLong()
-//        val MAX_TIME = (3000000000L * (Math.log10(id.toDouble()))).toLong()
-//
-//        fun getRandTime() = MIN_TIME + (Math.random() * (MAX_TIME - MIN_TIME))
-//        val timeWithDistance: Lazy<Long>
-//            get() = lazyOf((getRandTime() / 1001.0).toLong().coerceAtLeast(1))
-//
-//        var canDispose = false
-//        var isAnimating = false
-//        val xExtremity = measuredWidth.toLong() + radius
-//
-//        var x = AtomicLong(x ?: xExtremity)
-//
 //        val idTextBox = Rect()
 //
 //        init {
 //            Paints.textPaint.getTextBounds(id.toString(), 0, id.toString().length, idTextBox)
-//        }
-//
-//        fun startAnim() {
-//            isAnimating = true
-//            Observable.interval(timeWithDistance.value, TimeUnit.NANOSECONDS)
-//                    .subscribeOn(newThread())
-//                    .filter { shouldContinue }
-//                    .map { 0.001 }
-//                    .scan(Double::plus)
-//                    .map { 1 - it }
-//                    .takeWhile { it > 0 }
-//                    .onTerminateDetach()
-//                    .map { (xExtremity) * it - (radius / 2) }
-//                    .map(Double::toLong)
-//                    .subscribe(
-//                            {
-//                                x.set(it)
-//                                Subjects.refresh.onNext(Unit)
-//                            },
-//                            Throwable::printStackTrace
-//                            ,
-//                            {
-//                                //                                warn("CAN DISPOSE !")
-//                                canDispose = true
-//                                isAnimating = false
-//                                score.incrementAndGet()
-//                                ballDisposalSubject.onNext(id)
-//                            })
-//                    .addToDisposables()
 //        }
 //
 //        override fun render(canvas: Canvas) {
@@ -183,13 +142,6 @@ class CircleView : View, AnkoLogger, Disposable {
 //            canvas.drawText(currentBalls.indexOf(this@OldBall).toString(), this.x.get().toFloat(), this.y.toFloat() + this.idTextBox.height() / 2, Paints.textPaint)
 //            if (!this.isAnimating && !this.canDispose)
 //                this.startAnim()
-//        }
-//
-//        fun isIntersecting(another: OldBall): Boolean {
-//            val distanceXS = Math.pow((x.get() - another.x.get()).toDouble(), 2.0)
-//            val distanceYS = Math.pow((y - another.y).toDouble(), 2.0)
-//            val radiiS = Math.pow(((radius + strokeWidth / 2) + (another.radius + another.strokeWidth / 2)).toDouble(), 2.0)
-//            return distanceXS + distanceYS <= (radiiS)
 //        }
 //    }
     
@@ -200,7 +152,7 @@ class CircleView : View, AnkoLogger, Disposable {
     val currentBalls = AtomicArray<AnimatableBall?>(45)
     
     private val refreshFlowableObserver = object : DisposableSubscriber<Unit>() {
-        fun requestMore(x: Int) = request(x.toLong())
+        fun request(x: Int) = request(x.toLong())
         
         override fun onStart() {
             super.onStart()
@@ -208,7 +160,8 @@ class CircleView : View, AnkoLogger, Disposable {
         }
         
         override fun onNext(t: Unit) {
-            invalidate()
+            if (!(userBallOverlapSubject.value ?: false))
+                invalidate()
         }
         
         override fun onComplete() {
@@ -225,8 +178,8 @@ class CircleView : View, AnkoLogger, Disposable {
         
         refresher = Subjects.refresh
                 .subscribeOn(newThread())
-                .sample(1, TimeUnit.MILLISECONDS)
                 .toFlowable(BackpressureStrategy.DROP)
+                .sample(15, TimeUnit.MILLISECONDS)
                 .onTerminateDetach()
                 .takeUntil(
                         userBallOverlapSubject
@@ -256,7 +209,9 @@ class CircleView : View, AnkoLogger, Disposable {
                                     strokeWidth = defaultStrokeWidth.toFloat(),
                                     animationField = bounds,
                                     context = context
-                            )
+                            ).also {
+                                it.setCurrentPositionSubject(Subjects.circlesPositionSubject)
+                            }
                     )
                 }, Throwable::printStackTrace)
                 .addToDisposables()
@@ -294,17 +249,19 @@ class CircleView : View, AnkoLogger, Disposable {
                 }
                 .addToDisposables()
         
-        Observable.interval(1, TimeUnit.MILLISECONDS)
-//                .delay(1, TimeUnit.MILLISECONDS)
+        
+        Subjects.circlesPositionSubject
+                .subscribeOn(newThread())
+                .observeOn(newThread())
+                .flatMapIterable { currentBalls.filter { ball -> ball?.id == it.id ?: false } }
+                .observeOn(computation())
+                .map { it?.isIntersecting(userBall) ?: false }
+                .filter { it }
                 .filter { !(userBallOverlapSubject.value ?: false) }
-                .subscribeOn(computation())
-                .subscribe {
-                    val overlap = currentBalls
-                            .indexOfFirst {
-                                it?.isIntersecting(userBall) ?: false
-                            } != -1
-                    userBallOverlapSubject.onNext(overlap)
-                }
+                .onTerminateDetach()
+                .observeOn(newThread())
+                .doAfterNext { warn(Thread.currentThread().name) }
+                .subscribe { userBallOverlapSubject.onNext(it) }
                 .addToDisposables()
         
         userBallOverlapSubject
@@ -351,24 +308,17 @@ class CircleView : View, AnkoLogger, Disposable {
     }
     
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+//        if (userBall.asCircle.contains(event.x, event.y))
         Subjects.userPoint.onNext(pointsManager.setAndGet(event.x, event.y))
         return true
     }
     
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        canvas.apply {
-            (0 until currentBalls.length())
-                    .map { currentBalls[it] }
-                    .filter { it != null }
-                    .forEach {
-                        it?.render(canvas)
-                    }
-            userBall.render(canvas)
-//            drawCircle(userPoint.x, userPoint.y, userBallRadius.toFloat(), Paints.userCirclePaint)
-            bottomLeftText.render(canvas)
-        }
-        refreshFlowableObserver.requestMore(1)
+        currentBalls.forEach { it?.render(canvas) }
+        userBall.render(canvas)
+        bottomLeftText.render(canvas)
+        refreshFlowableObserver.request(2)
     }
     
     override fun getLayerType(): Int {

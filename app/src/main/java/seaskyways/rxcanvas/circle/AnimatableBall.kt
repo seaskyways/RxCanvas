@@ -78,7 +78,7 @@ class AnimatableBall(
                         {
                             center.set(it, center.y)
                             _doOnNext?.invoke()
-                            currentPositionSubject.onNext(Circle(center, radius, id))
+                            currentPositionSubject?.onNext(Circle(center, radius, id))
                         }
                         , Throwable::printStackTrace
                         , this::dispose
@@ -101,6 +101,7 @@ class AnimatableBall(
         super.dispose()
         stop()
         _onDispose?.invoke()
+        currentPositionSubject = null
     }
     
 }

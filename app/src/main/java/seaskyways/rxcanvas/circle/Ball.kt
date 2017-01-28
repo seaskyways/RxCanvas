@@ -7,6 +7,7 @@ import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.*
 import org.jetbrains.anko.dip
 import seaskyways.rxcanvas.*
+import java.lang.*
 import java.lang.Math.pow
 
 /**
@@ -22,6 +23,7 @@ open class Ball(
         val isDynamic: Boolean = false
 ) : Renderable, Disposable {
     val disposables = CompositeDisposable()
+    val asCircle get() = Circle(center, radius, id)
     
     open val ballPaint = lazy {
         Paint().also {
@@ -38,8 +40,17 @@ open class Ball(
             velocitySubject.onNext(value)
         }
     
-    protected val currentPositionSubject: PublishSubject<Circle> = PublishSubject.create<Circle>()
-    val currentPositionObservable get() = currentPositionSubject.hide()
+    
+    internal fun setCurrentPositionSubject(s: PublishSubject<Circle>) {
+        if (currentPositionSubject == null) {
+            currentPositionSubject = s
+        } else {
+            throw UnsupportedOperationException()
+        }
+    }
+    
+    protected var currentPositionSubject: PublishSubject<Circle>? = null
+    val currentPositionObservable get() = currentPositionSubject?.hide()
     
     val baseRadius = radius
     val baseStrokeWidth = strokeWidth
