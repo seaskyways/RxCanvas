@@ -16,7 +16,7 @@ import org.jetbrains.anko.*
 import seaskyways.rxcanvas.*
 import seaskyways.rxcanvas.Renderable.Companion.rederable
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.*
 
 /**
  * Created by Ahmad on 15/01 Jan/2017.
@@ -155,12 +155,11 @@ class CircleView : View, AnkoLogger, Disposable {
         fun request(x: Int) = request(x.toLong())
         
         override fun onStart() {
-            super.onStart()
-            request(1)
+            request(2)
         }
         
         override fun onNext(t: Unit) {
-            if (!(userBallOverlapSubject.value ?: false))
+            if (!userBallOverlapSubject.values.contains(true))
                 invalidate()
         }
         
@@ -178,14 +177,14 @@ class CircleView : View, AnkoLogger, Disposable {
         
         refresher = Subjects.refresh
                 .subscribeOn(newThread())
+                .takeUntil(
+                        userBallOverlapSubject
+                                .filter { it }
+                )
                 .toFlowable(BackpressureStrategy.DROP)
                 .sample(15, TimeUnit.MILLISECONDS)
                 .onTerminateDetach()
-                .takeUntil(
-                        userBallOverlapSubject
-                                .toFlowable(BackpressureStrategy.MISSING)
-                                .filter { it }
-                )
+        
         
         refresher
                 .observeOn(AndroidSchedulers.mainThread())
@@ -193,7 +192,7 @@ class CircleView : View, AnkoLogger, Disposable {
                 .addToDisposables()
         
         val timer = Observable
-                .defer { Observable.timer(250,TimeUnit.MILLISECONDS) }
+                .defer { Observable.timer(250, TimeUnit.MILLISECONDS) }
                 .repeatUntil { userBallOverlapSubject.value ?: false }
                 .subscribeOn(newThread())
                 .map { 1 }
@@ -290,7 +289,7 @@ class CircleView : View, AnkoLogger, Disposable {
             @Synchronized get
             @Synchronized set
         
-        private val arbitraryPoints = Array(20) { PointF() }
+        private val arbitraryPoints = Array(5) { PointF() }
         
         @Synchronized
         fun getAndMoveToNext(): PointF {
@@ -308,9 +307,20 @@ class CircleView : View, AnkoLogger, Disposable {
                 }
     }
     
+    var canMove = false
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-//        if (userBall.asCircle.contains(event.x, event.y))
-        Subjects.userPoint.onNext(pointsManager.setAndGet(event.x, event.y))
+        when (event.actionMasked) {
+            MotionEvent.ACTION_UP -> {
+                canMove = false
+            }
+            else -> {
+                if (userBall.asCircle.contains(event.x, event.y))
+                    canMove = true
+            }
+        }
+        if (canMove) {
+            Subjects.userPoint.onNext(pointsManager.setAndGet(event.x, event.y))
+        }
         return true
     }
     

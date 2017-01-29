@@ -26,7 +26,7 @@ class AnimatableBall(
         const val MAX_TIME = 3_000_000_000L
         const val NUMBER_OF_ANIMATION_EMISSIONS = 600
         fun getRandTime(): Double = MIN_TIME + (Math.random() * (MAX_TIME - MIN_TIME))
-        fun getRandomTimeIntervalFromEmissions(factor : Int = 1) = (getRandTime() * factor / NUMBER_OF_ANIMATION_EMISSIONS).toLong().coerceAtLeast(1)
+        fun getRandomTimeIntervalFromEmissions(factor: Int = 1) = (getRandTime() * factor / NUMBER_OF_ANIMATION_EMISSIONS).toLong().coerceAtLeast(1)
     }
     
     val ctxRef = WeakReference(context)
@@ -52,7 +52,7 @@ class AnimatableBall(
                     .map { 1 - it }
                     .takeWhile { it > 0 }
                     .onTerminateDetach()
-                    .map { (xExtremity) * it - (radius / 2) }
+                    .map { (xExtremity + (baseRadius * 2)) * it - (baseRadius * 2) }
                     .publish()
     
     override val ballPaint: Lazy<Paint> = lazy {
@@ -63,7 +63,8 @@ class AnimatableBall(
     }
     
     override fun render(canvas: Canvas) {
-        super.render(canvas)
+        if (isRunning || canDispose)
+            super.render(canvas)
     }
     
     override fun isRunning() = isAnimating
@@ -103,5 +104,6 @@ class AnimatableBall(
         _onDispose?.invoke()
         currentPositionSubject = null
     }
+    
     
 }
