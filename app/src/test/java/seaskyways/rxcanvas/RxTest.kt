@@ -1,11 +1,13 @@
 package seaskyways.rxcanvas
 
 import io.reactivex.Observable
+import io.reactivex.schedulers.Schedulers
 import io.reactivex.schedulers.Schedulers.*
 import org.junit.Test
 import java.lang.System.nanoTime
 import java.lang.Thread.currentThread
 import java.lang.Thread.sleep
+import java.util.concurrent.TimeUnit
 
 /**
  * Created by User1 on 23/01 - Jan/17.
@@ -76,5 +78,17 @@ class RxTest {
                 })
                 
         println("Ended with at ${nanoTime() - startTime}")
+    }
+    
+    @Test
+    fun schedulerTest(){
+        val newScheduler = Schedulers.computation()
+        Observable.range(0,1000)
+                .subscribeOn(newScheduler)
+                .subscribe()
+        Thread.sleep(1000)
+        newScheduler.schedulePeriodicallyDirect({
+            println("hello")
+        },0,10,TimeUnit.MILLISECONDS)
     }
 }

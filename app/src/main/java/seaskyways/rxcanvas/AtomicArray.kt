@@ -15,9 +15,7 @@ class AtomicArray<T> : AtomicReferenceArray<T>, Iterable<T> {
             }
             
             override fun next(): T {
-                return get(x - 1).apply {
-                    x++
-                }
+                return get(x++ - 1)
             }
         }
     }

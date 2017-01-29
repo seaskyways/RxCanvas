@@ -6,6 +6,7 @@ import android.graphics.drawable.Animatable
 import io.reactivex.Observable
 import io.reactivex.observables.ConnectableObservable
 import io.reactivex.schedulers.Schedulers
+import org.jetbrains.anko.AnkoLogger
 import java.lang.ref.WeakReference
 import java.util.concurrent.TimeUnit
 
@@ -18,25 +19,30 @@ class AnimatableBall(
         radius: Float,
         strokeWidth: Float,
         animationField: Rect,
-        val isRtl: Boolean = false,
+        isRtl: Boolean = false,
         context: Context? = null
-) : Ball(id, center, radius, strokeWidth), Animatable {
+) : Ball(id, center, radius, strokeWidth), Animatable, AnkoLogger {
     object Defaults {
         const val MIN_TIME = 1_000_000_000L /*NANOSECONDS*/
         const val MAX_TIME = 3_000_000_000L
-        const val NUMBER_OF_ANIMATION_EMISSIONS = 600
+        const val NUMBER_OF_ANIMATION_EMISSIONS = 1001
         fun getRandTime(): Double = MIN_TIME + (Math.random() * (MAX_TIME - MIN_TIME))
-        fun getRandomTimeIntervalFromEmissions(factor: Int = 1) = (getRandTime() * factor / NUMBER_OF_ANIMATION_EMISSIONS).toLong().coerceAtLeast(1)
+        fun getRandomTimeIntervalFromEmissions(factor: Int = 1) = (getRandTime() * factor.coerceAtLeast(1) / NUMBER_OF_ANIMATION_EMISSIONS).toLong().coerceAtLeast(1)
     }
     
-    val ctxRef = WeakReference(context)
+    private val ctxRef = WeakReference(context)
     
     var canDispose = false
-        get() = field && !isAnimating
+        private set
     
     private var isAnimating = false
     
-    val xExtremity = animationField.width() + radius
+    val startXExtremity = animationField.width() + (baseRadius * 2)
+    val endXExtremity = baseRadius * 2
+    
+    init {
+        center.x = if (isRtl) startXExtremity else endXExtremity
+    }
     
     private var _doOnNext: (() -> Unit)? = null
     fun doOnNext(b: () -> Unit) {
@@ -44,15 +50,24 @@ class AnimatableBall(
     }
     
     val animationObservable: ConnectableObservable<Double> =
-            Observable.interval(Defaults.getRandomTimeIntervalFromEmissions(Math.log10(id.toDouble()).toInt().coerceAtLeast(1)), TimeUnit.NANOSECONDS)
-                    .subscribeOn(Schedulers.newThread())
+            Observable.interval(
+                    Defaults.getRandomTimeIntervalFromEmissions(
+                            Math.log10(
+                                    id.toDouble()
+                            ).toInt()
+                    ), TimeUnit.NANOSECONDS)
+                    .subscribeOn(Schedulers.computation())
                     .filter { isAnimating }
                     .map { 1.0 / Defaults.NUMBER_OF_ANIMATION_EMISSIONS }
                     .scan(Double::plus)
-                    .map { 1 - it }
-                    .takeWhile { it > 0 }
+                    .map {
+                        if (!isRtl) 1 - it else it
+                    }
+                    .takeWhile {
+                        if (!isRtl) it >= 0 else it <= 1
+                    }
                     .onTerminateDetach()
-                    .map { (xExtremity + (baseRadius * 2)) * it - (baseRadius * 2) }
+                    .map { (startXExtremity * it) - (endXExtremity) }
                     .publish()
     
     override val ballPaint: Lazy<Paint> = lazy {
@@ -71,7 +86,6 @@ class AnimatableBall(
     
     override fun start() {
         if (isRunning || canDispose) return
-        isAnimating = true
         
         val disposable = animationObservable
                 .map(Double::toFloat)
@@ -86,6 +100,7 @@ class AnimatableBall(
                 )
         animationObservable.connect()
         disposables.add(disposable)
+        isAnimating = true
     }
     
     override fun stop() {

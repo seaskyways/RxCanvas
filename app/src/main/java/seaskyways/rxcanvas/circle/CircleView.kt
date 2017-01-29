@@ -14,7 +14,6 @@ import io.reactivex.subjects.*
 import io.reactivex.subscribers.DisposableSubscriber
 import org.jetbrains.anko.*
 import seaskyways.rxcanvas.*
-import seaskyways.rxcanvas.Renderable.Companion.rederable
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.*
 
@@ -70,6 +69,10 @@ class CircleView : View, AnkoLogger, Disposable {
     }
     
     override fun dispose() {
+        Subjects.circlesPositionSubject.onComplete()
+        Subjects.refresh.onComplete()
+        Subjects.userPoint.onComplete()
+        userBallOverlapSubject.onComplete()
         disposables.dispose()
     }
     
@@ -88,7 +91,7 @@ class CircleView : View, AnkoLogger, Disposable {
     val userBallRect by lazy { RectF() }
     
     init {
-        val userVelocityRefreshRate = 15L
+        val userVelocityRefreshRate = 10L
         val sampledUserPoint = Subjects.userPoint
                 .subscribeOn(Schedulers.computation())
                 .toFlowable(BackpressureStrategy.DROP)
@@ -97,8 +100,8 @@ class CircleView : View, AnkoLogger, Disposable {
         
         sampledUserPoint
                 .subscribeWith(object : DisposableSubscriber<PointF>() {
-                    override fun onError(t: Throwable?) = TODO()
-                    override fun onComplete() = TODO()
+                    override fun onError(t: Throwable?) = Unit
+                    override fun onComplete() = Unit
                     override fun onNext(it: PointF) {
                         userBall.updateVelocity(it, userVelocityRefreshRate, ctx = context)
                         request(2)
@@ -152,7 +155,7 @@ class CircleView : View, AnkoLogger, Disposable {
     val currentBalls = AtomicArray<AnimatableBall?>(45)
     
     private val refreshFlowableObserver = object : DisposableSubscriber<Unit>() {
-        fun request(x: Int) = request(x.toLong())
+        fun request(x: Number) = request(x.toLong())
         
         override fun onStart() {
             request(2)
@@ -185,7 +188,6 @@ class CircleView : View, AnkoLogger, Disposable {
                 .sample(15, TimeUnit.MILLISECONDS)
                 .onTerminateDetach()
         
-        
         refresher
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribeWith(refreshFlowableObserver)
@@ -195,6 +197,7 @@ class CircleView : View, AnkoLogger, Disposable {
                 .defer { Observable.timer(250, TimeUnit.MILLISECONDS) }
                 .repeatUntil { userBallOverlapSubject.value ?: false }
                 .subscribeOn(newThread())
+                .doAfterNext { warn(Thread.currentThread().name) }
                 .map { 1 }
                 .scan(Int::plus)
                 .filter { shouldContinue }
@@ -209,7 +212,8 @@ class CircleView : View, AnkoLogger, Disposable {
                             radius = dip(25).toFloat(),
                             strokeWidth = defaultStrokeWidth.toFloat(),
                             animationField = bounds,
-                            context = context
+                            context = context,
+                            isRtl = false
                     )
                 }
                 .doOnNext { it.setCurrentPositionSubject(Subjects.circlesPositionSubject) }
@@ -225,7 +229,6 @@ class CircleView : View, AnkoLogger, Disposable {
                 .subscribe {
                     currentBalls.set(it, null)
                     score.incrementAndGet()
-                    System.gc()
                 }
                 .addToDisposables()
         
@@ -233,7 +236,7 @@ class CircleView : View, AnkoLogger, Disposable {
                 .subscribeOn(newThread())
                 .observeOn(newThread())
                 .subscribe { ball ->
-                    val nearestNullIndex = nearestNullIndex()
+                    val nearestNullIndex = findNearestNullIndex()
                     nearestNullIndex.let {
                         currentBalls.set(it, ball)
                     }
@@ -272,7 +275,7 @@ class CircleView : View, AnkoLogger, Disposable {
         
     }
     
-    fun nearestNullIndex(): Int {
+    fun findNearestNullIndex(): Int {
         val index = (0 until currentBalls.length())
                 .filter { currentBalls[it] == null }
                 .firstOrNull() ?: 0

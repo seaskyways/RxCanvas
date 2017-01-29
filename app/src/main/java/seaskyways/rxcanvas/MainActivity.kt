@@ -25,7 +25,7 @@ class MainActivity : RxActivity() {
         val circleView = CircleView(ctx)
         parentView.addView(circleView, matchParent, matchParent)
         
-        circleView.lifecycleObservable = lifecycle()
+//        circleView.lifecycleObservable = lifecycle()
         lifecycle()
                 .subscribe {
                     circleView.shouldContinue = it == ActivityEvent.RESUME
@@ -42,30 +42,24 @@ class MainActivity : RxActivity() {
                 .toFlowable(BackpressureStrategy.DROP)
                 .observeOn(AndroidSchedulers.mainThread())
                 .subscribe(object : DisposableSubscriber<Boolean>() {
-                    override fun onError(t: Throwable?) {
-                        
+                    override fun onStart() {
+                        request(1)
                     }
-                    
+                    override fun onError(t: Throwable?) = Unit
                     override fun onNext(t: Boolean?) {
-                        alert("Restart Game ?") {
+                        val msg = "You avOided ${circleView.score.get()} Balls !"
+                        alert(message = msg, title = "Restart Game ?") {
                             okButton {
                                 circleView.dispose()
                                 circleView.shouldContinue = true
-                                circleView.userBallOverlapSubject.onComplete()
                                 parentView.removeView(circleView)
                                 startLogic(parentView)
-                                request(1)
                             }
-                            noButton()
                             show()
                         }
                     }
                     
-                    
-                    override fun onComplete() {
-                        
-                    }
-                    
+                    override fun onComplete() = Unit
                 })
     }
 }

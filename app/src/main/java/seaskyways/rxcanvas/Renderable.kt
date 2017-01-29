@@ -7,12 +7,10 @@ import android.graphics.Canvas
  */
 interface Renderable {
     fun render(canvas: Canvas)
-    
-    companion object {
-        fun rederable(r: (Canvas) -> Unit): Renderable = object : Renderable {
-            override fun render(canvas: Canvas) {
-                r(canvas)
-            }
-        }
+}
+
+fun rederable(r: (Canvas) -> Unit): Renderable = object : Renderable {
+    override fun render(canvas: Canvas) {
+        r(canvas)
     }
 }
