@@ -1,14 +1,29 @@
 package seaskyways.rxcanvas.circle
 
 import android.content.Context
-import android.graphics.*
-import io.reactivex.disposables.*
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.PointF
+import android.renderscript.Allocation
+import android.renderscript.Element
+import android.renderscript.RenderScript
+import android.renderscript.Type
+import io.reactivex.Single
+import io.reactivex.disposables.CompositeDisposable
+import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
-import io.reactivex.subjects.*
+import io.reactivex.subjects.BehaviorSubject
+import io.reactivex.subjects.PublishSubject
+import org.jetbrains.anko.AnkoLogger
 import org.jetbrains.anko.dip
-import seaskyways.rxcanvas.*
-import java.lang.*
+import org.jetbrains.anko.warn
+import seaskyways.rxcanvas.Renderable
+import seaskyways.rxcanvas.addToDisposables
+import seaskyways.rxcanvas.power
+import seaskyways.seaskyways.rxcanvas.circle.ScriptC_circle_ops
 import java.lang.Math.pow
+import java.lang.UnsupportedOperationException
 
 /**
  * Created by Ahmad on 26/01 Jan/2017.
@@ -21,7 +36,7 @@ open class Ball(
         val minimumRadius: Float = 0f,
         val minimumStrokeWidth: Float = 5f,
         val isDynamic: Boolean = false
-) : Renderable, Disposable {
+) : Renderable, Disposable, AnkoLogger {
     val disposables = CompositeDisposable()
     val asCircle get() = Circle(center, radius, id)
     
@@ -98,5 +113,37 @@ open class Ball(
         val distanceYS = (center.y - another.center.y) power 2
         val radiiS = pow(((radius + strokeWidth / 4) + (another.radius + another.strokeWidth / 4)).toDouble(), 2.0)
         return distanceXS + distanceYS <= (radiiS)
+    }
+    
+    fun isIntersection(renderScript: RenderScript, another: Ball): Single<Boolean> {
+        val script = ScriptC_circle_ops(renderScript)
+        script.apply {
+            _x_in1 = center.x
+            _y_in1 = center.y
+            _radius_in1 = radius
+            _stroke_width1 = strokeWidth
+            _x_in2 = another.center.x
+            _y_in2 = another.center.y
+            _radius_in2 = another.radius
+            _stroke_width2 = another.strokeWidth
+            _result = -2
+        }
+        return Single.create { emitter ->
+            val alloc = Allocation.createTyped(renderScript, Type.Builder(renderScript, Element.I32(renderScript)).create())
+            val result = IntArray(1) { -2 }
+            script.forEach_find_intersection_new(alloc)
+            alloc.copy1DRangeFrom(0, 1, result)
+            warn(result[0])
+            emitter.onSuccess(result[0] == 1)
+        }
+        
+//        return Single.fromCallable {
+//            script.invoke_find_intersection()
+//            while (script._result.toInt() == -2) {
+//            }
+//            script._result.toInt()
+//        }
+//                .subscribeOn(Schedulers.newThread())
+//                .map { it == 1 }
     }
 }

@@ -7,7 +7,11 @@ import com.trello.rxlifecycle2.components.RxActivity
 import io.reactivex.BackpressureStrategy
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.subscribers.DisposableSubscriber
-import org.jetbrains.anko.*
+import org.jetbrains.anko.alert
+import org.jetbrains.anko.ctx
+import org.jetbrains.anko.find
+import org.jetbrains.anko.matchParent
+import seaskyways.rxcanvas.R
 import seaskyways.rxcanvas.circle.CircleView
 
 class MainActivity : RxActivity() {

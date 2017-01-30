@@ -2,7 +2,9 @@
 
 package seaskyways.rxcanvas
 
-import io.reactivex.disposables.*
+import io.reactivex.Observable
+import io.reactivex.disposables.CompositeDisposable
+import io.reactivex.disposables.Disposable
 import java.lang.ref.WeakReference
 
 /**

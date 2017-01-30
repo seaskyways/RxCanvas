@@ -21,6 +21,6 @@ public class ExampleInstrumentedTest {
         // Context of the app under test.
         Context appContext = InstrumentationRegistry.getTargetContext();
 
-        assertEquals("seaskyways.rxcanvas", appContext.getPackageName());
+        assertEquals("seaskyways.seaskyways.rxcanvas", appContext.getPackageName());
     }
 }

@@ -9,6 +9,7 @@ import com.trello.rxlifecycle2.android.ActivityEvent
 import io.reactivex.BackpressureStrategy
 import io.reactivex.Flowable
 import io.reactivex.Observable
+import io.reactivex.Single
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.disposables.Disposable
@@ -261,21 +262,29 @@ class CircleView : View, AnkoLogger, Disposable {
                     ball.start()
                 }
                 .addToDisposables()
-        
-        
+
+//        val renderScript = RenderScript.create(context)
         Subjects.circlesPositionSubject
                 .subscribeOn(newThread())
                 .observeOn(newThread())
-                .flatMap { (_, _, circleId) : Circle ->
+                .flatMap { (_, _, circleId): Circle ->
                     Observable
                             .create<Ball> { emitter ->
                                 val ball = currentBalls.firstOrNull { ball -> ball?.id == circleId ?: false }
                                 ball?.let { emitter.onNext(it) }
                                 emitter.onComplete()
                             }
-                            .map { it.isIntersecting(userBall) }
-                            .filter { it }
                             .subscribeOn(Schedulers.computation())
+//                            .flatMapSingle {
+//                                it.isIntersection(renderScript, userBall)
+//                                        .subscribeOn(Schedulers.computation())
+//                            }
+                            .flatMapSingle {
+                                Single.fromCallable { it.isIntersecting(userBall) }
+                                        .subscribeOn(Schedulers.computation())
+                            }
+                            .filter { it }
+                    
                 }
                 .observeOn(newThread())
                 .filter { !(userBallOverlapSubject.value ?: false) }
@@ -352,9 +361,9 @@ class CircleView : View, AnkoLogger, Disposable {
         bottomLeftText.render(canvas)
         refreshFlowableObserver.request(2)
     }
-    
-    override fun getLayerType(): Int {
-        return LAYER_TYPE_HARDWARE
-    }
+//
+//    override fun getLayerType(): Int {
+//        return LAYER_TYPE_HARDWARE
+//    }
     
 }

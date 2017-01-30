@@ -5,12 +5,14 @@ android {
     compileSdkVersion 25
     buildToolsVersion "25.0.2"
     defaultConfig {
-        applicationId "seaskyways.rxcanvas"
+        applicationId "seaskyways.seaskyways.rxcanvas"
         minSdkVersion 17
         targetSdkVersion 25
-        versionCode 2
-        versionName "0.2-pre-alpha"
+        versionCode 3
+        versionName "0.3-pre-alpha"
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+        renderscriptTargetApi 18
+        renderscriptSupportModeEnabled false
     }
     buildTypes {
         release {
