@@ -91,7 +91,7 @@ class AnimatableBall(
                 .map(Double::toFloat)
                 .subscribe(
                         {
-                            center.set(it, center.y)
+                            center.x = it
                             _doOnNext?.invoke()
                             currentPositionSubject?.onNext(Circle(center, radius, id))
                         }

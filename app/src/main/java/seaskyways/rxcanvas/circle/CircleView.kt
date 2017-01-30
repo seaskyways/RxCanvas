@@ -3,19 +3,30 @@ package seaskyways.rxcanvas.circle
 import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
-import android.view.*
+import android.view.MotionEvent
+import android.view.View
 import com.trello.rxlifecycle2.android.ActivityEvent
-import io.reactivex.*
+import io.reactivex.BackpressureStrategy
+import io.reactivex.Flowable
+import io.reactivex.Observable
 import io.reactivex.android.schedulers.AndroidSchedulers
-import io.reactivex.disposables.*
+import io.reactivex.disposables.CompositeDisposable
+import io.reactivex.disposables.Disposable
 import io.reactivex.schedulers.Schedulers
-import io.reactivex.schedulers.Schedulers.*
-import io.reactivex.subjects.*
+import io.reactivex.schedulers.Schedulers.newThread
+import io.reactivex.schedulers.Schedulers.single
+import io.reactivex.subjects.BehaviorSubject
+import io.reactivex.subjects.PublishSubject
 import io.reactivex.subscribers.DisposableSubscriber
-import org.jetbrains.anko.*
-import seaskyways.rxcanvas.*
+import org.jetbrains.anko.AnkoLogger
+import org.jetbrains.anko.dip
+import org.jetbrains.anko.sp
+import seaskyways.rxcanvas.AtomicArray
+import seaskyways.rxcanvas.Renderable
+import seaskyways.rxcanvas.addToDisposables
+import seaskyways.rxcanvas.rederable
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.*
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Created by Ahmad on 15/01 Jan/2017.
@@ -197,7 +208,6 @@ class CircleView : View, AnkoLogger, Disposable {
                 .defer { Observable.timer(250, TimeUnit.MILLISECONDS) }
                 .repeatUntil { userBallOverlapSubject.value ?: false }
                 .subscribeOn(newThread())
-                .doAfterNext { warn(Thread.currentThread().name) }
                 .map { 1 }
                 .scan(Int::plus)
                 .filter { shouldContinue }
@@ -256,14 +266,21 @@ class CircleView : View, AnkoLogger, Disposable {
         Subjects.circlesPositionSubject
                 .subscribeOn(newThread())
                 .observeOn(newThread())
-                .flatMapIterable { currentBalls.filter { ball -> ball?.id == it.id ?: false } }
-                .observeOn(computation())
-                .map { it?.isIntersecting(userBall) ?: false }
-                .filter { it }
+                .flatMap { (_, _, circleId) : Circle ->
+                    Observable
+                            .create<Ball> { emitter ->
+                                val ball = currentBalls.firstOrNull { ball -> ball?.id == circleId ?: false }
+                                ball?.let { emitter.onNext(it) }
+                                emitter.onComplete()
+                            }
+                            .map { it.isIntersecting(userBall) }
+                            .filter { it }
+                            .subscribeOn(Schedulers.computation())
+                }
+                .observeOn(newThread())
                 .filter { !(userBallOverlapSubject.value ?: false) }
                 .onTerminateDetach()
                 .observeOn(newThread())
-                .doAfterNext { warn(Thread.currentThread().name) }
                 .subscribe { userBallOverlapSubject.onNext(it) }
                 .addToDisposables()
         
@@ -276,10 +293,8 @@ class CircleView : View, AnkoLogger, Disposable {
     }
     
     fun findNearestNullIndex(): Int {
-        val index = (0 until currentBalls.length())
-                .filter { currentBalls[it] == null }
-                .firstOrNull() ?: 0
-        
+        var index = currentBalls.indexOfFirst { it == null }
+        if (index == -1) index = 0
         return index
     }
     
@@ -308,6 +323,9 @@ class CircleView : View, AnkoLogger, Disposable {
                     it.x = x
                     it.y = y
                 }
+        
+        @Synchronized
+        fun getLastPoints(): List<PointF> = arbitraryPoints.toList()
     }
     
     var canMove = false
