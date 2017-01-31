@@ -3,29 +3,18 @@ package seaskyways.rxcanvas.circle
 import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
-import android.view.MotionEvent
-import android.view.View
+import android.view.*
 import com.trello.rxlifecycle2.android.ActivityEvent
-import io.reactivex.BackpressureStrategy
-import io.reactivex.Flowable
-import io.reactivex.Observable
-import io.reactivex.Single
+import io.reactivex.*
 import io.reactivex.android.schedulers.AndroidSchedulers
-import io.reactivex.disposables.CompositeDisposable
-import io.reactivex.disposables.Disposable
+import io.reactivex.disposables.*
 import io.reactivex.schedulers.Schedulers
 import io.reactivex.schedulers.Schedulers.newThread
 import io.reactivex.schedulers.Schedulers.single
-import io.reactivex.subjects.BehaviorSubject
-import io.reactivex.subjects.PublishSubject
+import io.reactivex.subjects.*
 import io.reactivex.subscribers.DisposableSubscriber
-import org.jetbrains.anko.AnkoLogger
-import org.jetbrains.anko.dip
-import org.jetbrains.anko.sp
-import seaskyways.rxcanvas.AtomicArray
-import seaskyways.rxcanvas.Renderable
-import seaskyways.rxcanvas.addToDisposables
-import seaskyways.rxcanvas.rederable
+import org.jetbrains.anko.*
+import seaskyways.rxcanvas.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -196,8 +185,8 @@ class CircleView : View, AnkoLogger, Disposable {
                         userBallOverlapSubject
                                 .filter { it }
                 )
-                .toFlowable(BackpressureStrategy.DROP)
-                .sample(15, TimeUnit.MILLISECONDS)
+                .toFlowable(BackpressureStrategy.LATEST)
+//                .sample(15, TimeUnit.MILLISECONDS)
                 .onTerminateDetach()
         
         refresher
@@ -275,10 +264,6 @@ class CircleView : View, AnkoLogger, Disposable {
                                 emitter.onComplete()
                             }
                             .subscribeOn(Schedulers.computation())
-//                            .flatMapSingle {
-//                                it.isIntersection(renderScript, userBall)
-//                                        .subscribeOn(Schedulers.computation())
-//                            }
                             .flatMapSingle {
                                 Single.fromCallable { it.isIntersecting(userBall) }
                                         .subscribeOn(Schedulers.computation())
@@ -286,7 +271,6 @@ class CircleView : View, AnkoLogger, Disposable {
                             .filter { it }
                     
                 }
-                .observeOn(newThread())
                 .filter { !(userBallOverlapSubject.value ?: false) }
                 .onTerminateDetach()
                 .observeOn(newThread())
@@ -335,13 +319,33 @@ class CircleView : View, AnkoLogger, Disposable {
         
         @Synchronized
         fun getLastPoints(): List<PointF> = arbitraryPoints.toList()
+        
+        @Synchronized
+        fun sendTouchEvent(event: MotionEvent) {
+            Subjects.userPoint.onNext(setAndGet(event.x, event.y))
+        }
     }
     
     var canMove = false
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_UP -> {
+                if (!canMove) return true
                 canMove = false
+                Observable.create<Unit> { emitter ->
+                    for (i in 0..2) {
+                        if (canMove) {
+                            emitter.onComplete()
+                            return@create
+                        }
+                        emitter.onNext(Unit)
+                        Thread.sleep(5)
+                    }
+                    emitter.onComplete()
+                }
+                        .subscribeOn(Schedulers.single())
+                        .map { event }
+                        .subscribe(pointsManager::sendTouchEvent)
             }
             else -> {
                 if (userBall.asCircle.contains(event.x, event.y))
@@ -349,7 +353,7 @@ class CircleView : View, AnkoLogger, Disposable {
             }
         }
         if (canMove) {
-            Subjects.userPoint.onNext(pointsManager.setAndGet(event.x, event.y))
+            pointsManager.sendTouchEvent(event)
         }
         return true
     }

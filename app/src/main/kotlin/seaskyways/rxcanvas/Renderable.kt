@@ -5,6 +5,7 @@ import android.graphics.Canvas
 /**
  * Created by Ahmad on 21/01 Jan/2017.
  */
+@FunctionalInterface
 interface Renderable {
     fun render(canvas: Canvas)
 }

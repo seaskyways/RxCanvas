@@ -19,6 +19,4 @@ inline fun <T, R> WeakReference<T>.safe(body: T.() -> R?): R? {
 
 inline fun <T : Disposable> T.addToDisposables(compositeDisposable: CompositeDisposable) = compositeDisposable.add(this)
 
-fun Math.pow(x: Number, power: Number) = Math.pow(x.toDouble(), power.toDouble())
-
 infix fun Number.power(pow: Number) = Math.pow(this.toDouble(), pow.toDouble())
