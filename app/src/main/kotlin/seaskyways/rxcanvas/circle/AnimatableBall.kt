@@ -20,7 +20,8 @@ class AnimatableBall(
         strokeWidth: Float,
         animationField: Rect,
         isRtl: Boolean = false,
-        context: Context? = null
+        context: Context? = null,
+        isDynamic : Boolean = false
 ) : Ball(id, center, radius, strokeWidth), Animatable, AnkoLogger {
     object Defaults {
         const val MIN_TIME = 1_000_000_000L /*NANOSECONDS*/
@@ -37,8 +38,8 @@ class AnimatableBall(
     
     private var isAnimating = false
     
-    val startXExtremity = animationField.width() + (baseRadius * 2)
-    val endXExtremity = -baseRadius * 2
+    val startXExtremity = animationField.width() + (baseRadius * 2) + baseStrokeWidth
+    val endXExtremity = -(baseRadius * 2 + baseStrokeWidth)
     
     init {
         center.x = if (isRtl) endXExtremity else startXExtremity
@@ -53,7 +54,7 @@ class AnimatableBall(
             Observable.interval(
                     Defaults.getRandomTimeIntervalFromEmissions(
                             Math.log10(
-                                    id.toDouble()
+                                    id.toDouble() * 3
                             ).toInt()
                     ), TimeUnit.NANOSECONDS)
                     .subscribeOn(Schedulers.computation())

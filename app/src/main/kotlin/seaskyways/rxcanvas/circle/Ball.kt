@@ -48,7 +48,7 @@ open class Ball(
         }
     }
     
-    private var velocitySubject: BehaviorSubject<Double> = BehaviorSubject.createDefault<Double>(0.0)
+    private var velocitySubject: BehaviorSubject<Double> = BehaviorSubject.create<Double>()
     private var velocity: Double
         get() = velocitySubject.value
         set(value) {
@@ -70,25 +70,6 @@ open class Ball(
     val baseRadius = radius
     val baseStrokeWidth = strokeWidth
     
-    init {
-        if (isDynamic) {
-            velocitySubject
-                    .subscribeOn(Schedulers.newThread())
-                    .map { it * 4.0 }
-                    .subscribe { newVelocity ->
-                        radius = (baseRadius - newVelocity).toFloat().coerceAtLeast(minimumRadius)
-                        if (radius == minimumRadius) {
-                            strokeWidth = (baseStrokeWidth - radius).coerceAtLeast(minimumStrokeWidth)
-                            ballPaint.value.strokeWidth = strokeWidth
-                        } else {
-                            strokeWidth = baseStrokeWidth
-                            ballPaint.value.strokeWidth = strokeWidth
-                        }
-                    }
-                    .addToDisposables(disposables)
-        }
-    }
-    
     fun updateVelocity(p: PointF, userVelocityRefreshRate: Long, ctx: Context, shouldUpdatePosition: Boolean = true) = with(ctx) {
         val dx = dip(p.x - center.x)
         val dy = dip(p.y - center.y)
@@ -106,8 +87,8 @@ open class Ball(
     }
     
     override fun isDisposed() = disposables.isDisposed
-    override fun dispose() = disposables.dispose()
     
+    override fun dispose() = disposables.dispose()
     fun isIntersecting(another: Ball): Boolean {
         val distanceXS = (center.x - another.center.x) power 2
         val distanceYS = (center.y - another.center.y) power 2
@@ -146,4 +127,28 @@ open class Ball(
 //                .subscribeOn(Schedulers.newThread())
 //                .map { it == 1 }
     }
+    
+    init {
+        if (isDynamic) {
+            initVelocity()
+        }
+    }
+    
+    protected fun initVelocity(){
+        velocitySubject
+                .subscribeOn(Schedulers.newThread())
+                .map { it * 4.0 }
+                .subscribe { newVelocity ->
+                    radius = (baseRadius - newVelocity).toFloat().coerceAtLeast(minimumRadius)
+                    if (radius == minimumRadius) {
+                        strokeWidth = (baseStrokeWidth - radius).coerceAtLeast(minimumStrokeWidth)
+                        ballPaint.value.strokeWidth = strokeWidth
+                    } else {
+                        strokeWidth = baseStrokeWidth
+                        ballPaint.value.strokeWidth = strokeWidth
+                    }
+                }
+                .addToDisposables(disposables)
+    }
+    
 }

@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
 import android.view.*
-import com.trello.rxlifecycle2.android.ActivityEvent
 import io.reactivex.*
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.*
@@ -22,8 +21,6 @@ import java.util.concurrent.atomic.AtomicInteger
  * Created by Ahmad on 15/01 Jan/2017.
  */
 class CircleView : View, AnkoLogger, Disposable {
-    
-    
     constructor(context: Context?) : super(context)
     constructor(context: Context?, attrs: AttributeSet?) : super(context, attrs)
     constructor(context: Context?, attrs: AttributeSet?, defStyleAttr: Int) : super(context, attrs, defStyleAttr)
@@ -65,9 +62,7 @@ class CircleView : View, AnkoLogger, Disposable {
         }
     }
     
-    override fun isDisposed(): Boolean {
-        return disposables.isDisposed
-    }
+    override fun isDisposed() = disposables.isDisposed
     
     override fun dispose() {
         Subjects.circlesPositionSubject.onComplete()
@@ -89,7 +84,6 @@ class CircleView : View, AnkoLogger, Disposable {
                 center = PointF(measuredWidth / 8f, measuredHeight / 2f)
         )
     }
-    val userBallRect by lazy { RectF() }
     
     init {
         val userVelocityRefreshRate = 10L
@@ -126,13 +120,13 @@ class CircleView : View, AnkoLogger, Disposable {
     
     var shouldContinue = true
     
-    var lifecycleObservable: Observable<ActivityEvent>? = null
-        set(value) {
-            field = value
-            value?.subscribe { currLifecycle = it }
-        }
-    
-    var currLifecycle: ActivityEvent = ActivityEvent.PAUSE
+//    var lifecycleObservable: Observable<ActivityEvent>? = null
+//        set(value) {
+//            field = value
+//            value?.subscribe { currLifecycle = it }
+//        }
+//
+//    var currLifecycle: ActivityEvent = ActivityEvent.PAUSE
 
 //    inner class OldBall(val id: Int = 1, val y: Int, val radius: Long = dip(25).toLong(), x: Long? = null, val strokeWidth: Int = defaultStrokeWidth) : Renderable {
 //        val idTextBox = Rect()
@@ -222,10 +216,10 @@ class CircleView : View, AnkoLogger, Disposable {
         
         ballDisposalSubject
                 .observeOn(newThread())
-                .flatMapIterable { ballId ->
-                    (0 until currentBalls.length())
-                            .filter { i -> currentBalls[i]?.id ?: 0 == ballId }
+                .map { ballId ->
+                    currentBalls.indexOfFirst { it?.id == ballId }
                 }
+                .filter { it != -1 }
                 .subscribe {
                     currentBalls.set(it, null)
                     score.incrementAndGet()
