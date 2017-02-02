@@ -66,10 +66,11 @@ open class DynamicAdapter<T, HOLDER : DynamicViewHolder?> protected constructor(
         return this
     }
     
-    fun into(recycler: RecyclerView, layoutManager: RecyclerView.LayoutManager = LinearLayoutManager(context)): Unit {
+    fun into(recycler: RecyclerView, layoutManager: RecyclerView.LayoutManager = LinearLayoutManager(context)): Adapter<DynamicViewHolder?> {
         recyclerViewRef = WeakReference(recycler)
         recycler.adapter = this
         recycler.layoutManager = layoutManager
+        return this
     }
     
     override fun getItemCount(): Int {

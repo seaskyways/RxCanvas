@@ -23,9 +23,9 @@ class ScoreboardActivity : BaseActivity() {
         ui.setContentView(this)
         
         AnkoDynamicAdapter
-                .with<GameScoreViewModel, SingleGameScoreUI>(ctx) { SingleGameScoreUI() }
+                .with<GameScoreViewModel, SingleGameScoreUI>(ctx, ::SingleGameScoreUI)
                 .data(dataList)
-                .onBind { gameScoreViewModel: GameScoreViewModel, singleGameScoreUI: SingleGameScoreUI, dynamicViewHolder: DynamicViewHolder, i: Int ->
+                .onBind { gameScoreViewModel: GameScoreViewModel, singleGameScoreUI: SingleGameScoreUI, _: DynamicViewHolder, _: Int ->
                     singleGameScoreUI.bindGameScore(gameScoreViewModel)
                 }
                 .into(ui.recycler)
