@@ -1,7 +1,8 @@
 package seaskyways.rxcanvas
 
-import android.graphics.Bitmap
+import android.graphics.*
 import android.os.Bundle
+import android.view.View
 import android.widget.FrameLayout
 import com.trello.rxlifecycle2.android.ActivityEvent
 import com.trello.rxlifecycle2.components.RxActivity
@@ -22,11 +23,18 @@ class MainActivity : RxActivity() {
         setContentView(R.layout.activity_main)
         val frame: FrameLayout = find(R.id.activity_main)
         
-        startLogic(frame, true)
+        startLogic(frame)
         
     }
     
-    fun startLogic(parentView: FrameLayout, isOnCreate: Boolean = false) {
+    fun View.loadBitmapFromView(width: Int, height: Int): Bitmap {
+        val b = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+        val c = Canvas(b)
+        draw(c)
+        return b
+    }
+    
+    fun startLogic(parentView: FrameLayout) {
         val circleView = CircleView(ctx)
         parentView.addView(circleView, matchParent, matchParent)
 
@@ -77,10 +85,10 @@ class MainActivity : RxActivity() {
     fun saveGame(circleView: CircleView) = run {
         circleView.isDrawingCacheEnabled = true
         circleView.buildDrawingCache()
-        val imageOfCircleView: Bitmap = circleView.drawingCache
+        val imageOfCircleView: Bitmap = circleView.loadBitmapFromView(circleView.measuredWidth, circleView.measuredHeight)
         doAsync {
             val byteArrayOutputStream = ByteArrayOutputStream()
-            imageOfCircleView.compress(Bitmap.CompressFormat.WEBP, 100, byteArrayOutputStream)
+            imageOfCircleView.compress(Bitmap.CompressFormat.PNG, 100, byteArrayOutputStream)
             val gameImageAsByteArray = byteArrayOutputStream.toByteArray()
             
             val gameRecord = GameScore()

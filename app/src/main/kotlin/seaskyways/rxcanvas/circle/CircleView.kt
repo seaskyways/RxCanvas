@@ -5,6 +5,7 @@ import android.graphics.*
 import android.util.AttributeSet
 import android.view.*
 import io.reactivex.*
+import io.reactivex.Observable
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.*
 import io.reactivex.schedulers.Schedulers
@@ -14,6 +15,7 @@ import io.reactivex.subjects.*
 import io.reactivex.subscribers.DisposableSubscriber
 import org.jetbrains.anko.*
 import seaskyways.rxcanvas.*
+import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -60,6 +62,10 @@ class CircleView : View, AnkoLogger, Disposable {
                 color = Color.RED
             }
         }
+    }
+    
+    init {
+        backgroundColor = Color.WHITE
     }
     
     override fun isDisposed() = disposables.isDisposed

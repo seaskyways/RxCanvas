@@ -5,26 +5,21 @@ package seaskyways.rxcanvas.utils
  */
 
 import android.content.Context
-import android.support.v7.widget.LinearLayoutManager
-import android.support.v7.widget.RecyclerView
+import android.support.v7.widget.*
 import android.support.v7.widget.RecyclerView.Adapter
-import android.view.View
-import android.view.ViewGroup
-import org.jetbrains.anko.AnkoComponent
-import org.jetbrains.anko.AnkoContext
-import org.jetbrains.anko.AnkoLogger
-import org.jetbrains.anko.layoutInflater
+import android.view.*
+import org.jetbrains.anko.*
 import java.lang.ref.WeakReference
 
 /**
  * Created by Ahmad on 10/11 Nov/2016.
  */
-open class DynamicAdapter<T, HOLDER : DynamicViewHolder?> protected constructor(val context: Context) : Adapter<DynamicViewHolder?>() {
+open class DynamicAdapter<T, HOLDER : DynamicViewHolder?> protected constructor() : Adapter<DynamicViewHolder?>() {
     
     companion object {
-        fun <T, HOLDER : DynamicViewHolder> with(ctx: Context) = DynamicAdapter<T, HOLDER>(ctx)
+        fun <T, HOLDER : DynamicViewHolder> build() = DynamicAdapter<T, HOLDER>()
         
-        fun <T> withDynamic(ctx: Context) = DynamicAdapter<T, DynamicViewHolder?>(ctx)
+        fun <T> buildDynamic() = DynamicAdapter<T, DynamicViewHolder?>()
     }
     
     
@@ -35,9 +30,7 @@ open class DynamicAdapter<T, HOLDER : DynamicViewHolder?> protected constructor(
     protected var recyclerViewRef = WeakReference<RecyclerView?>(null)
 //    private var recyclerView: RecyclerView? = null
     
-    protected var onBindLambda: DynamicAdapter<T, HOLDER>.(T?, View?, DynamicViewHolder?, Int) -> Unit = {
-        data: T?, view: View?, holder: DynamicViewHolder?, position: Int ->
-    }
+    protected var onBindLambda: DynamicAdapter<T, HOLDER>.(T?, View?, DynamicViewHolder?, Int) -> Unit = { _, _, _, _ -> }
     protected var onCreateViewHolderLambda: ((parent: View, viewType: Int) -> HOLDER)? = null
     
     fun overrideViewHolder(onViewHolder: (parent: View, viewType: Int) -> HOLDER): DynamicAdapter<T, HOLDER> {
@@ -45,19 +38,17 @@ open class DynamicAdapter<T, HOLDER : DynamicViewHolder?> protected constructor(
         return this
     }
     
-    open fun data(list: Collection<T>): DynamicAdapter<T, HOLDER> {
+    open fun data(list: Collection<T>): DynamicAdapter<T, HOLDER> = apply {
         dataList = list
-        return this
     }
     
     
-    fun layout(layoutRes: Int? = null, view: AnkoComponent<ViewGroup>? = null): DynamicAdapter<T, HOLDER> {
+    fun layout(layoutRes: Int? = null, view: AnkoComponent<ViewGroup>? = null): DynamicAdapter<T, HOLDER>  = apply {
         when {
             layoutRes != null -> layoutInt = layoutRes
             view != null -> layoutView = view
             else -> throw NullPointerException()
         }
-        return this
     }
     
     @Suppress("UNCHECKED_CAST")
@@ -66,7 +57,7 @@ open class DynamicAdapter<T, HOLDER : DynamicViewHolder?> protected constructor(
         return this
     }
     
-    fun into(recycler: RecyclerView, layoutManager: RecyclerView.LayoutManager = LinearLayoutManager(context)): Adapter<DynamicViewHolder?> {
+    fun into(recycler: RecyclerView, layoutManager: RecyclerView.LayoutManager): Adapter<DynamicViewHolder?> {
         recyclerViewRef = WeakReference(recycler)
         recycler.adapter = this
         recycler.layoutManager = layoutManager
@@ -90,7 +81,7 @@ open class DynamicAdapter<T, HOLDER : DynamicViewHolder?> protected constructor(
             return onCreateViewHolderLambda?.invoke(layoutView!!.createView(AnkoContext.Companion.create(parent.context, parent)), viewType)!!
         } else {
             when {
-                layoutInt != null -> return BasicViewHolder(context.layoutInflater.inflate(layoutInt!!, parent, false))
+                layoutInt != null -> return BasicViewHolder(parent.context.layoutInflater.inflate(layoutInt!!, parent, false))
                 layoutView != null -> return BasicViewHolder(layoutView!!.createView(AnkoContext.Companion.create(parent.context, parent)))
             }
         }
@@ -102,27 +93,33 @@ open class DynamicAdapter<T, HOLDER : DynamicViewHolder?> protected constructor(
 
 abstract class DynamicViewHolder(itemView: View?) : RecyclerView.ViewHolder(itemView)
 
-class AnkoDynamicAdapter<T, A : AnkoComponent<ViewGroup>> private constructor(val ctx: Context) : DynamicAdapter<T, AnkoDynamicAdapter<T, A>.AnkoViewHolder?>(ctx), AnkoLogger {
+class AnkoDynamicAdapter<T, A : AnkoComponent<ViewGroup>> private constructor() : DynamicAdapter<T, AnkoDynamicAdapter.AnkoViewHolder<A>?>(), AnkoLogger {
     
     companion object {
-        fun <T, A : AnkoComponent<ViewGroup>> with(ctx: Context, ankoComponentGenerator: () -> A) = AnkoDynamicAdapter<T, A>(ctx).apply {
+        fun <T, A : AnkoComponent<ViewGroup>> with(ankoComponentGenerator: () -> A) = AnkoDynamicAdapter<T, A>().apply {
             ankoGenerator = ankoComponentGenerator
         }
     }
     
-    inner class AnkoViewHolder(val itemView: View, val ankoComponent: A) : DynamicViewHolder(itemView)
+    class AnkoViewHolder<out A>(itemView: View, val ankoComponent: A) : DynamicViewHolder(itemView)
     
     var ankoGenerator: (() -> A)? = null
     var _onBind: (AnkoDynamicAdapter<T, A>.(T, A, DynamicViewHolder, Int) -> Unit)? = null
     
-    fun onBind(__onBind: AnkoDynamicAdapter<T, A>.(T, A, DynamicViewHolder, Int) -> Unit) = apply { _onBind = __onBind }
+    fun onAnkoBind(__onBind: AnkoDynamicAdapter<T, A>.(T, A, DynamicViewHolder, Int) -> Unit) = apply { _onBind = __onBind }
+    
+    fun onBindSimple(__onBindSimple: AnkoDynamicAdapter<T, A>.(T, A, Int) -> Unit) = apply {
+        _onBind = { T, A, _, position ->
+            __onBindSimple(T, A, position)
+        }
+    }
     
     override fun data(list: Collection<T>): AnkoDynamicAdapter<T, A> {
         super.data(list)
         return this
     }
     
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AnkoViewHolder? {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AnkoViewHolder<A>? {
         ankoGenerator?.let { ankoGenerator ->
             val anko = ankoGenerator()
             val holder = AnkoViewHolder(anko.createView(AnkoContext.Companion.create(parent.context, parent)), anko)
@@ -132,13 +129,9 @@ class AnkoDynamicAdapter<T, A : AnkoComponent<ViewGroup>> private constructor(va
     }
     
     override fun onBindViewHolder(holder: DynamicViewHolder?, position: Int) {
-        val data = try {
-            dataList?.elementAt(position)
-        } catch (e: IndexOutOfBoundsException) {
-            null
-        }
+        val data = dataList?.elementAtOrNull(position)
         @Suppress("UNCHECKED_CAST")
-        val aholder = holder!! as AnkoDynamicAdapter<T, A>.AnkoViewHolder
+        val aholder = holder as AnkoDynamicAdapter.AnkoViewHolder<A>
         if (data != null)
             _onBind?.invoke(this, data, aholder.ankoComponent, aholder, position)
     }

@@ -5,6 +5,7 @@ package seaskyways.rxcanvas
 import io.reactivex.Observable
 import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.disposables.Disposable
+import io.realm.Realm
 import java.lang.ref.WeakReference
 
 /**
@@ -20,3 +21,5 @@ inline fun <T, R> WeakReference<T>.safe(body: T.() -> R?): R? {
 inline fun <T : Disposable> T.addToDisposables(compositeDisposable: CompositeDisposable) = compositeDisposable.add(this)
 
 infix fun Number.power(pow: Number) = Math.pow(this.toDouble(), pow.toDouble())
+
+val realm get() = Realm.getDefaultInstance()
