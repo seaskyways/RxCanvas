@@ -4,8 +4,7 @@ package seaskyways.rxcanvas.utils
  * Created by Ahmad on 01/02 Feb/2017.
  */
 
-import android.content.Context
-import android.support.v7.widget.*
+import android.support.v7.widget.RecyclerView
 import android.support.v7.widget.RecyclerView.Adapter
 import android.view.*
 import org.jetbrains.anko.*

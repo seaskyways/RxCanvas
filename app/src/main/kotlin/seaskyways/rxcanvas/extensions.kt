@@ -22,4 +22,4 @@ inline fun <T : Disposable> T.addToDisposables(compositeDisposable: CompositeDis
 
 infix fun Number.power(pow: Number) = Math.pow(this.toDouble(), pow.toDouble())
 
-val realm get() = Realm.getDefaultInstance()
+val realm: Realm get() = Realm.getDefaultInstance()
